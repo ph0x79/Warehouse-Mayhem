@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<link rel="stylesheet" href="https://use.typekit.net/amf8fwb.css">
 <meta charset="UTF-8">
 <title>Warehouse Mayhem</title>
 <style>
@@ -10,7 +11,47 @@
 </style>
 </head>
 <body>
+<audio id="bgMusic" src="music/KMD1.mp3" loop preload="auto" style="display:none"></audio>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
+<style>
+#muteBtn {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 1000;
+  background: #FFC425;
+  color: #242424;
+  border: 2px solid #242424;
+  padding: 6px 14px;
+  font-family: 'industry', 'Arial Black', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 2px;
+  letter-spacing: 0.05em;
+}
+#muteBtn:hover { background: #FFDB6E; }
+</style>
+<button id="muteBtn" onclick="toggleMute()">🔊 MUSIC</button>
+<script>
+  const music = document.getElementById('bgMusic');
+  // Start music on first user interaction (browser autoplay policy)
+  let musicStarted = false;
+  function ensureMusic() {
+    if (!musicStarted) {
+      musicStarted = true;
+      music.volume = 0.5;
+      music.play().catch(() => {});
+    }
+  }
+  document.addEventListener('click', ensureMusic, { once: false });
+  document.addEventListener('keydown', ensureMusic, { once: false });
+
+  function toggleMute() {
+    music.muted = !music.muted;
+    document.getElementById('muteBtn').textContent = music.muted ? '🔇 MUSIC' : '🔊 MUSIC';
+  }
+</script>
 <script>
 // ============================================================
 //  CONSTANTS — tweak these to tune the game
@@ -22,7 +63,7 @@ const C = {
   POOP_COOLDOWN:   1500,   // ms between throws
   POOP_SPEED:      520,
   SPAWN_RATE_BASE: 3000,   // ms between enemy spawns (decreases over time)
-  FAN_THRESHOLD:   500,    // score points to charge the fan
+  FAN_THRESHOLD:   1000,   // score points to charge the fan
   MUSIC_TRACKS:    [],     // e.g. ['music/track1.mp3', 'music/track2.mp3']
 
   // NES-ish palette
@@ -38,14 +79,14 @@ const C = {
     BOX_TAN:     0xD8A048,
     BOX_DARK:    0x885820,
     BOX_SHADE:   0xA86828,
-    HAZARD_YEL:  0xF8C800,
+    HAZARD_YEL:  0xFFC425,
     HAZARD_BLK:  0x282828,
     PALLET:      0xB87840,
     PALLET_D:    0x805030,
     SKY_CEIL:    0x283050,   // ceiling/upper bg
     WALL:        0x5C6070,
     WALL_D:      0x404550,
-    STRIPE_YEL:  0xF8D800,
+    STRIPE_YEL:  0xFFC425,
   }
 };
 
@@ -62,7 +103,7 @@ class BootScene extends Phaser.Scene {
     this.makePoopTextures();
     this.makeEnemyTextures();
     this.makeFanTextures();
-    this.scene.start('Game');
+    this.scene.start('Title');
   }
 
   // ── Helper: draw a pixel rect on a graphics object
@@ -129,10 +170,10 @@ class BootScene extends Phaser.Scene {
     const BROWN_L    = 0xC07840;
     const FACE       = 0xE8B080;
     const FACE_D     = 0xC89060;
-    const VEST_YEL   = 0xF5C400;
-    const VEST_SHADE = 0xB89000;
+    const VEST_YEL   = 0xFFC425;
+    const VEST_SHADE = 0xCC9000;
     const VEST_DARK  = 0x8A6C00;
-    const HAT_YEL    = 0xFFD700;
+    const HAT_YEL    = 0xFFC425;
     const HAT_SHADE  = 0xCC9900;
     const HAT_DARK   = 0x997700;
     const HAT_BRIM   = 0xFFE44A;
@@ -432,14 +473,14 @@ class BootScene extends Phaser.Scene {
       head(g,  0, 0, 0x111122, 0x000011);
       body(g,  0, 0, SHIRT, SHIRT_D, PANTS,  3);
       // badge
-      px(g, 0xFFD700, 5, 16, 3, 3);
+      px(g, 0xFFC425, 5, 16, 3, 3);
       // gun arm (right arm extended)
       px(g, SKIN,    13, 14,  2, 5);
       px(g, 0x333333,14, 18,  3, 2); // gun
       // frame 1
       head(g, 16, 0, 0x111122, 0x000011);
       body(g, 16, 0, SHIRT, SHIRT_D, PANTS, -3);
-      px(g, 0xFFD700,21, 16, 3, 3);
+      px(g, 0xFFC425,21, 16, 3, 3);
       px(g, SKIN,    29, 14,  2, 5);
       px(g, 0x333333,30, 18,  3, 2);
       g.generateTexture('guard', 32, 34);
@@ -482,30 +523,54 @@ class BootScene extends Phaser.Scene {
         frameRate:6, repeat:-1 });
     }
 
-    // ── FORKLIFT (16x12 body, yellow)
+    // ── FORKLIFT — tall side profile (32x48), mast extends high enough to threaten shelves
     {
       const g = this.make.graphics({ add: false });
-      const YL  = 0xF5C400; const YD = 0xB89000;
-      const GRY = 0x888888; const BLK = 0x222222;
-      // Body
-      px(g, YL,  4,  2, 28, 16);
-      px(g, YD,  4, 16, 28,  3);  // underside
-      px(g, YD,  4,  2,  3, 16);  // left shadow
-      // Cab
-      px(g, YL,  8,  0, 16, 6);
-      px(g, 0x99CCFF, 10, 1, 6, 4); // windshield
-      // Forks (left side)
-      px(g, GRY,  0,  14, 6, 2);
-      px(g, GRY,  0,  18, 6, 2);
-      // Mast
-      px(g, GRY,  0,  4,  3, 16);
-      px(g, GRY,  2,  4,  1, 16);
-      // Wheels
-      px(g, BLK,  5,  18, 6, 5);
-      px(g, BLK, 23,  18, 6, 5);
-      px(g, GRY,  6,  19, 4, 3);
-      px(g, GRY, 24,  19, 4, 3);
-      g.generateTexture('forklift', 34, 24);
+      const YL  = 0xFFC425; const YD = 0xCC9000; const YS = 0xFFE088;
+      const GRY = 0x888898; const GD  = 0x555566; const BLK = 0x1A1A2A;
+      const WIN = 0x99CCFF;
+
+      // ── MAST (vertical rails, left side) — runs full height
+      px(g, GD,   0,  0,  3, 48);
+      px(g, GRY,  1,  0,  1, 48);
+      px(g, GD,   5,  0,  3, 48);
+      for (let y = 4; y < 44; y += 10) { px(g, GD, 0, y, 8, 2); }
+      // Forks
+      px(g, GRY,  0, 40,  8, 3);
+      px(g, GD,   0, 40,  8, 1);
+      px(g, GRY,  0, 44,  8, 3);
+      px(g, GD,   0, 44,  8, 1);
+
+      // ── BODY / CAB
+      px(g, YL,   8, 18, 24, 22);
+      px(g, YS,   8, 18, 24,  3);
+      px(g, YD,   8, 38, 24,  2);
+      px(g, YD,  29, 18,  3, 22);
+      px(g, YL,   8, 10, 20,  10);
+      px(g, YS,   8, 10, 20,   2);
+      px(g, YD,   8, 18, 20,   2);
+
+      // Windshield
+      px(g, WIN,  10, 12, 12,  6);
+      px(g, 0xCCEEFF, 10, 12, 4, 2);
+
+      // Roll cage
+      px(g, GD,   8, 10,  2, 10);
+      px(g, GD,  26, 10,  2, 10);
+
+      // Exhaust pipe
+      px(g, GD,  25,  6,  3, 10);
+      px(g, BLK, 25,  6,  3,  2);
+
+      // ── WHEELS
+      px(g, BLK,  8, 38,  8, 10);
+      px(g, GRY,  9, 39,  6,  8);
+      px(g, BLK, 24, 38,  8, 10);
+      px(g, GRY, 25, 39,  6,  8);
+      px(g, YD,  11, 41,  2,  4);
+      px(g, YD,  27, 41,  2,  4);
+
+      g.generateTexture('forklift', 32, 48);
       g.destroy();
     }
 
@@ -539,53 +604,102 @@ class BootScene extends Phaser.Scene {
   makeFanTextures() {
     const px = (g, col, x, y, w, h) => { g.fillStyle(col, 1); g.fillRect(x, y, w, h); };
 
-    // ── FAN HUB (center motor housing) — 20x20
+    // ── FAN HUB — larger, industrial motor housing (28x28) matching Powerfoil X4 scale
     {
       const g = this.make.graphics({ add: false });
-      const HUB  = 0x888898; const HUB_L = 0xBBCCDD; const HUB_D = 0x444454;
-      px(g, HUB,   2,  2, 16, 16);
-      px(g, HUB_L, 3,  2,  8,  4);  // top highlight
-      px(g, HUB_D, 2, 14, 16,  4);  // bottom shadow
-      px(g, HUB_D,14,  2,  4, 16);  // right shadow
-      px(g, 0x222233, 7, 7, 6, 6);  // center axle hole
-      px(g, 0x444466, 8, 8, 4, 4);
-      g.generateTexture('fan_hub', 20, 20);
-      g.destroy();
-    }
-
-    // ── FAN BLADE — single blade (60x14), will be rotated in code
-    {
-      const g = this.make.graphics({ add: false });
-      const BL  = 0xCCCCDD; const BL_L = 0xEEEEFF; const BL_D = 0x888899;
-      // Blade tapers from root (wide) to tip (narrow)
-      px(g, BL,   0,  3, 60,  8);   // main blade body
-      px(g, BL_L, 0,  3, 60,  2);   // top edge highlight
-      px(g, BL_D, 0,  9, 60,  2);   // bottom edge shadow
-      px(g, BL_D,54,  4,  6,  6);   // tip taper shadow
-      px(g, BL_L, 0,  3,  8,  2);   // root highlight
-      // Rivet at root
-      px(g, 0x666677, 4, 5, 4, 4);
-      px(g, 0xAAAABB, 5, 6, 2, 2);
-      g.generateTexture('fan_blade', 60, 14);
-      g.destroy();
-    }
-
-    // ── FAN MOUNT (ceiling bracket) — 80x16
-    {
-      const g = this.make.graphics({ add: false });
-      const MT = 0x555566; const MT_L = 0x7788AA; const MT_D = 0x333344;
-      px(g, MT,   0,  0, 80, 10);
-      px(g, MT_L, 0,  0, 80,  3);   // top highlight
-      px(g, MT_D, 0,  8, 80,  4);   // underside shadow
-      // Bolt holes
-      for (let x = 8; x < 80; x += 16) {
-        px(g, MT_D, x, 3, 4, 4);
-        px(g, 0x888899, x+1, 4, 2, 2);
+      const HUB  = 0x4A4A58;  // dark charcoal body
+      const HUB_L = 0x7A7A92; // highlight rim
+      const HUB_D = 0x28282E; // shadow
+      const RIM   = 0x5C5C70;
+      // Outer body
+      px(g, HUB,   2,  2, 24, 24);
+      // Rim highlight (top-left)
+      px(g, HUB_L, 2,  2, 24,  3);
+      px(g, HUB_L, 2,  2,  3, 24);
+      // Shadow (bottom-right)
+      px(g, HUB_D, 2, 23, 24,  3);
+      px(g, HUB_D,23,  2,  3, 24);
+      // Inner ring (blade attachment ring)
+      px(g, RIM,   6,  6, 16, 16);
+      px(g, HUB_L, 6,  6, 16,  2);
+      px(g, HUB_D, 6, 20, 16,  2);
+      // Center axle boss
+      px(g, HUB_D, 10, 10,  8,  8);
+      px(g, HUB_L, 11, 10,  4,  2);
+      px(g, 0x111118, 12, 12,  4,  4);  // axle hole
+      // Attachment bolt holes (4 cardinal)
+      for (const [bx,by] of [[6,13],[20,13],[13,6],[13,20]]) {
+        px(g, HUB_D, bx, by, 2, 2);
       }
-      // Drop rod down from center
-      px(g, MT_D,  36, 10,  8, 16);
-      px(g, MT_L,  37, 10,  3, 16);
-      g.generateTexture('fan_mount', 80, 26);
+      g.generateTexture('fan_hub', 28, 28);
+      g.destroy();
+    }
+
+    // ── FAN BLADE — Powerfoil X4 airfoil shape (76x18)
+    // Structure: [arm 10px][airfoil body 54px][yellow tip 12px]
+    // Airfoil profile: wider/thicker at root, tapers & sweeps at trailing edge
+    {
+      const g = this.make.graphics({ add: false });
+      const ARM  = 0x3A3A46;  // mounting arm — darker than blade
+      const BL   = 0x555568;  // charcoal blade body (Powerfoil dark gray)
+      const BL_L = 0x7A7A90;  // upper surface highlight
+      const BL_D = 0x2E2E38;  // lower surface shadow
+      const TIP  = 0xFFC425;  // Big Ass Fans yellow tip
+      const TIP_L = 0xFFE066;
+      const TIP_D = 0xCC9000;
+
+      // ── Mounting arm (root stub from hub to blade) — narrow rod
+      px(g, ARM,  0,  7,  10,  4);   // arm body center
+      px(g, 0x4E4E60, 0, 7, 10, 1);  // arm top highlight
+      px(g, 0x222228, 0, 10, 10, 1); // arm bottom shadow
+
+      // ── Airfoil body — camber: top surface starts row 4, bottom row 14
+      // Leading edge (left of airfoil): full height
+      px(g, BL,   10,  4, 54, 10);   // main airfoil slab
+      // Upper cambered surface — highlight row
+      px(g, BL_L, 10,  4, 54,  2);
+      // Lower surface shadow
+      px(g, BL_D, 10, 12, 54,  2);
+      // Trailing edge sweep: bottom surface steps up 1px every ~12px
+      // (simulates swept-back planform of Powerfoil X4)
+      px(g, BL_D, 10, 13, 20,  1);   // row 13 only near root
+      // Thicker root section (first 16px of airfoil, rows 3–14)
+      px(g, BL,   10,  3, 16,  1);   // extra row at top near root
+      px(g, BL,   10, 14, 16,  1);   // extra row at bottom near root
+      px(g, BL_L, 10,  3,  8,  1);   // root top highlight
+
+      // ── Yellow tip (last 12px)
+      px(g, TIP,  64,  4, 12, 10);
+      px(g, TIP_L,64,  4, 12,  2);   // tip highlight
+      px(g, TIP_D,64, 12, 12,  2);   // tip shadow
+      // Rounded tip — clip corners pixel-art style
+      px(g, TIP,  64,  4,  2,  1);   // shave top-left corner of tip
+      px(g, 0x000000, 76, 4, 0, 0);  // noop boundary
+
+      // Attachment bolt on arm
+      px(g, 0x5A5A6E, 4, 7, 3, 4);
+      px(g, BL_L,     5, 8, 1, 2);
+
+      g.generateTexture('fan_blade', 76, 18);
+      g.destroy();
+    }
+
+    // ── FAN MOUNT (ceiling bracket) — wider to match larger hub
+    {
+      const g = this.make.graphics({ add: false });
+      const MT = 0x3A3A46; const MT_L = 0x6A6A80; const MT_D = 0x1E1E26;
+      px(g, MT,   0,  0, 100, 10);
+      px(g, MT_L, 0,  0, 100,  3);
+      px(g, MT_D, 0,  8, 100,  4);
+      // Bolt holes
+      for (let x = 8; x < 100; x += 16) {
+        px(g, MT_D, x, 3, 4, 4);
+        px(g, MT_L, x+1, 4, 2, 2);
+      }
+      // Drop rod
+      px(g, MT_D, 46, 10,  8,  8);
+      px(g, MT_L, 47, 10,  3,  8);
+      g.generateTexture('fan_mount', 100, 18);
       g.destroy();
     }
   }
@@ -879,9 +993,9 @@ class GameScene extends Phaser.Scene {
       this.hitEnemy(enemy);
     });
 
-    // Player touches enemy (blade carrier, guard, manager body) → lose life
+    // Player touches any enemy → lose life
     this.physics.add.overlap(this.player, this.enemies, (player, enemy) => {
-      if (enemy.enemyType === 'blade') this.hurtPlayer();
+      this.hurtPlayer();
     });
 
     // Player touches forklift → instant life loss
@@ -896,13 +1010,7 @@ class GameScene extends Phaser.Scene {
       this.hurtPlayer();
     });
 
-    // Hazard projectiles hit platforms
-    this.physics.add.collider(this.hazards, this.platforms, (hazard) => {
-      hazard.destroy();
-    });
-    this.physics.add.collider(this.hazards, this.pallets, (hazard) => {
-      hazard.destroy();
-    });
+    // Hazard projectiles pass through platforms — only the player stops them
   }
 
   hitEnemy(enemy) {
@@ -952,9 +1060,11 @@ class GameScene extends Phaser.Scene {
       case 'worker':
         enemy = this.enemies.create(spawnX, floorY, 'worker');
         enemy.play('worker_walk');
-        enemy.points    = 100;
-        enemy.speed     = Phaser.Math.Between(60, 100);
-        enemy.enemyType = 'worker';
+        enemy.points     = 100;
+        enemy.speed      = Phaser.Math.Between(55, 90);
+        enemy.enemyType  = 'worker';
+        enemy.randomWalk = true;   // walks straight across, no pursuit
+        enemy.dir        = fromLeft ? 1 : -1;  // always walks toward opposite side
         break;
 
       case 'blade':
@@ -1000,26 +1110,34 @@ class GameScene extends Phaser.Scene {
 
   spawnForklift() {
     const fromLeft = Math.random() < 0.5;
-    const y = C.HEIGHT - 64 - 12;  // sits on floor
-    const x = fromLeft ? -40 : C.WIDTH + 40;
+    // Floor top is H-64, forklift image is 48px tall at scale 2 = 96px, center at H-64-48
+    const y = C.HEIGHT - 64 - 48;
+    const x = fromLeft ? -80 : C.WIDTH + 80;
     const fl = this.forklifts.create(x, y, 'forklift');
     fl.setScale(2).setDepth(3);
     fl.setGravityY(0);
-    fl.speed = Phaser.Math.Between(150, 260);
-    fl.dir   = fromLeft ? 1 : -1;
+    fl.body.setAllowGravity(false);
+    // No platform collision — forklifts race across floor level only
+    const spd = Phaser.Math.Between(320, 500);  // fast and dangerous
+    fl.dir = fromLeft ? 1 : -1;
     fl.setFlipX(fl.dir < 0);
-    fl.setVelocityX(fl.dir * fl.speed);
-    // Destroy when off-screen
-    this.time.delayedCall(8000, () => { if (fl.active) fl.destroy(); });
+    fl.setVelocityX(fl.dir * spd);
   }
 
   fireGuardShot(guard) {
-    const dart = this.hazards.create(guard.x, guard.y - 20, 'dart');
+    const ox = guard.x, oy = guard.y - 20;
+    const tx = this.player.x, ty = this.player.y;
+    const dart = this.hazards.create(ox, oy, 'dart');
     dart.setScale(2).setDepth(5);
-    dart.setGravityY(0);
-    const dir = this.player.x < guard.x ? -1 : 1;
-    dart.setVelocityX(dir * 380);
-    dart.setFlipX(dir < 0);
+    dart.body.setAllowGravity(true);
+    // Arc toward player, same compensation as chimp poop
+    const dx = tx - ox, dy = ty - oy;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const spd  = 420;
+    const vx   = (dx / dist) * spd;
+    const vy   = (dy / dist) * spd - 0.5 * C.GRAVITY * (dist / spd);
+    dart.setVelocity(vx, vy);
+    dart.setFlipX(vx < 0);
     this.time.delayedCall(3000, () => { if (dart.active) dart.destroy(); });
   }
 
@@ -1030,7 +1148,11 @@ class GameScene extends Phaser.Scene {
     const dx  = this.player.x - manager.x;
     const dy  = this.player.y - manager.y;
     const dist = Math.sqrt(dx*dx + dy*dy);
-    cb.setVelocity((dx/dist)*320, (dy/dist)*320 - 150);
+    // Arc toward player with gravity compensation, same as chimp poop
+    const spd = 400;
+    const vx2 = (dx/dist) * spd;
+    const vy2 = (dy/dist) * spd - 0.5 * C.GRAVITY * (dist / spd);
+    cb.setVelocity(vx2, vy2);
     this.time.delayedCall(3000, () => { if (cb.active) cb.destroy(); });
   }
 
@@ -1081,7 +1203,7 @@ class GameScene extends Phaser.Scene {
 
     // Floating score pop
     const pop = this.add.text(x, y - 20, '+' + pts, {
-      fontFamily: 'monospace', fontSize: '16px', color: '#FFFF00',
+      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '16px', color: '#FFC425',
       stroke: '#000', strokeThickness: 3
     }).setDepth(30);
     this.tweens.add({ targets: pop, y: y - 60, alpha: 0, duration: 900,
@@ -1092,104 +1214,112 @@ class GameScene extends Phaser.Scene {
   //  FAN SYSTEM
   // ─────────────────────────────────────────────────────────
   setupFan() {
-    const cx = C.WIDTH / 2;   // fan horizontally centered
-    const cy = 30;             // hangs from ceiling
+    const cx = C.WIDTH / 2;
+    const cy = 32;  // hub center y
 
     // Ceiling mount bracket
     this.add.image(cx, 0, 'fan_mount').setOrigin(0.5, 0).setScale(2).setDepth(2);
 
-    // Hub (static center, drawn on top of blades)
-    this.fanHub = this.add.image(cx, cy, 'fan_hub').setScale(2).setDepth(4);
-
-    // 6 blades, evenly spaced — stored as container children so we can rotate them
-    this.fanBladeContainer = this.add.container(cx, cy);
-    this.fanBladeContainer.setDepth(3);
-    const NUM_BLADES = 6;
-    this.fanBlades = [];
+    // Fan blades: each placed at hub center, origin at left edge so rotation pivots there.
+    // Set initial angle at spawn so all 6 are visible before spinning starts.
+    const NUM_BLADES = 8;
+    this.fanBladeImages = [];
+    this.fanAngle = 0;
     for (let i = 0; i < NUM_BLADES; i++) {
-      const angle = (i / NUM_BLADES) * 360;
-      const blade = this.add.image(20, 0, 'fan_blade')  // offset from hub center
+      const blade = this.add.image(cx, cy, 'fan_blade')
         .setOrigin(0, 0.5)
-        .setScale(2, 1.4);
-      blade.setAngle(angle);
-      this.fanBladeContainer.add(blade);
-      this.fanBlades.push(blade);
+        .setScale(2, 1)
+        .setDepth(3);
+      blade.angle = (i / NUM_BLADES) * 360;  // set after creation so origin pivot is applied
+      this.fanBladeImages.push(blade);
     }
-    // Redraw hub on top
-    this.fanHub = this.add.image(cx, cy, 'fan_hub').setScale(2).setDepth(5);
+
+    // Hub drawn on top of blades
+    this.fanHubImg = this.add.image(cx, cy, 'fan_hub').setScale(2).setDepth(5);
 
     // Fan state
+    this.fanCX         = cx;
+    this.fanCY         = cy;
     this.fanSpinning   = false;
-    this.fanSpeed      = 0;       // degrees per frame
-    this.fanNextThresh = C.FAN_THRESHOLD;
-    this.fanUsed       = false;   // has been triggered this charge cycle
+    this.fanSpeed      = 0;
+    this.fanNextThresh    = C.FAN_THRESHOLD;
+    this.fanTriggered     = false;
+    this.fanLockoutUntil  = 0;   // epoch ms — score doesn't count toward fan during lockout
 
-    // Hit zone — wide rectangle at top of screen where poop triggers spread
-    this.fanZone = this.add.zone(cx, cy + 10, 240, 60).setOrigin(0.5, 0);
-    this.physics.add.existing(this.fanZone, true); // static body
-
-    // Poop overlaps fan zone while spinning
-    this.physics.add.overlap(this.poops, this.fanZone, (poop) => {
-      if (this.fanSpinning && !this.fanUsed && poop.active) {
-        this.fanUsed = true;
-        this.triggerFanSpread(poop.x, poop.y);
-        poop.destroy();
-      }
-    });
-
-    // Fan charge progress bar (below fan, above everything)
-    const barW = 120;
-    this.fanBarBg = this.add.rectangle(cx, cy + 50, barW, 6, 0x333333)
-      .setOrigin(0.5, 0.5).setDepth(10);
-    this.fanBar = this.add.rectangle(cx - barW/2, cy + 50, 0, 6, 0x44AAFF)
-      .setOrigin(0, 0.5).setDepth(11);
-    this.fanLabel = this.add.text(cx, cy + 59, 'FAN CHARGE', {
-      fontFamily: 'monospace', fontSize: '9px', color: '#88CCFF'
-    }).setOrigin(0.5, 0).setDepth(11);
+    // No physics zone — detection is done via distance check in updateFan()
+    // This avoids Phaser stale-pair bugs with destroyed objects + static zones
+    this.fanZoneActive = false;  // armed in startFanSpin
   }
 
   updateFan() {
-    // Check if we've crossed the next threshold
-    if (!this.fanSpinning && this.score >= this.fanNextThresh) {
+    // Spin up if threshold crossed and not in post-nuke lockout
+    const now = this.time.now;
+    if (!this.fanSpinning && this.score >= this.fanNextThresh && now >= this.fanLockoutUntil) {
       this.startFanSpin();
     }
 
-    // Rotate blades
+    // Manual poop-hits-fan detection — immune to Phaser stale overlap pairs
+    if (this.fanSpinning && this.fanZoneActive && !this.fanTriggered) {
+      this.poops.getChildren().forEach(poop => {
+        if (!poop.active || this.fanTriggered) return;
+        const dx = poop.x - this.fanCX;
+        const dy = poop.y - this.fanCY;
+        if (Math.sqrt(dx*dx + dy*dy) < 130) {
+          this.fanTriggered  = true;
+          this.fanZoneActive = false;
+          this.nukeAllEnemies();
+          this.triggerFanSpread(poop.x, poop.y);
+          poop.destroy();
+        }
+      });
+    }
+
+    // Rotate blades by updating each blade's angle around the hub center
     if (this.fanSpeed > 0) {
-      this.fanBladeContainer.angle += this.fanSpeed;
+      this.fanAngle += this.fanSpeed;
+      const NUM = this.fanBladeImages.length;
+      this.fanBladeImages.forEach((blade, i) => {
+        blade.setAngle(this.fanAngle + (i / NUM) * 360);
+      });
+
       // Slow down after spread fires
-      if (this.fanUsed) {
-        this.fanSpeed = Math.max(0, this.fanSpeed - 0.12);
-        if (this.fanSpeed === 0) {
-          this.fanSpinning = false;
-          this.fanUsed     = false;
+      if (this.fanTriggered) {
+        this.fanSpeed -= 0.1;
+        if (this.fanSpeed <= 0) {
+          this.fanSpeed      = 0;
+          this.fanSpinning   = false;
+          this.fanTriggered  = false;
           this.fanNextThresh += C.FAN_THRESHOLD;
         }
       }
     }
 
-    // Update charge bar — progress toward next threshold
-    const prev  = this.fanNextThresh - C.FAN_THRESHOLD;
-    const range = C.FAN_THRESHOLD;
-    const frac  = this.fanSpinning ? 1 : Math.min((this.score - prev) / range, 1);
-    const barW  = 120;
-    this.fanBar.setDisplaySize(frac * barW, 6);
-    this.fanBar.setFillStyle(this.fanSpinning ? 0x00FFFF : 0x44AAFF);
-    // Pulse label when ready
+    // Update HUD charge bar
+    const prev     = this.fanNextThresh - C.FAN_THRESHOLD;
+    const frac     = this.fanSpinning ? 1 : Math.min((this.score - prev) / C.FAN_THRESHOLD, 1);
+    const isLocked = !this.fanSpinning && this.time.now < this.fanLockoutUntil;
+    const secsLeft = Math.ceil((this.fanLockoutUntil - this.time.now) / 1000);
+    const pct      = Math.min(Math.floor(frac * 100), 100);
+    this.fanBar.setDisplaySize(frac * 100, 8);
+    this.fanBar.setFillStyle(this.fanSpinning ? 0xFF0000 : (isLocked ? 0xFF6622 : 0xFF3300));
     if (this.fanSpinning) {
-      this.fanLabel.setText('🎯 AIM AT FAN!');
-      this.fanLabel.setColor('#00FFFF');
+      this.fanLabel.setText('HEAT STRESS 100%');
+      this.fanLabel.setColor('#FF0000');
+    } else if (isLocked) {
+      this.fanLabel.setText('HEAT STRESS ' + secsLeft + 's');
+      this.fanLabel.setColor('#FF8844');
     } else {
-      this.fanLabel.setText('FAN CHARGE');
-      this.fanLabel.setColor('#88CCFF');
+      this.fanLabel.setText('HEAT STRESS ' + pct + '%');
+      this.fanLabel.setColor('#FFFFFF');
     }
   }
 
   startFanSpin() {
-    this.fanSpinning = true;
-    this.fanSpeed    = 0;
+    this.fanSpinning   = true;
+    this.fanTriggered  = false;
+    this.fanZoneActive = true;  // arm distance detection for this spin cycle
+    this.fanSpeed      = 0;
     SFX.fanRevUp();
-    // Ramp up speed over 1.2s
     this.tweens.addCounter({
       from: 0, to: 14, duration: 1200,
       onUpdate: (tween) => { this.fanSpeed = tween.getValue(); }
@@ -1200,31 +1330,49 @@ class GameScene extends Phaser.Scene {
     SFX.fanSpread();
     this.doSplat(x, y, true);
 
-    // Emit 8 poop projectiles evenly in all directions
+    // Visual-only poop spray — uses plain images, no physics body, can't hit enemies
     const NUM = 8;
     for (let i = 0; i < NUM; i++) {
-      const angleDeg = (i / NUM) * 360;
-      const angleRad = Phaser.Math.DegToRad(angleDeg);
-      const spd      = 380;
-
-      const fp = this.poops.create(x, y, 'poop');
-      fp.setScale(2).setDepth(5);
-      fp.body.setAllowGravity(false);  // fan spread travels straight
-      fp.setVelocity(Math.cos(angleRad) * spd, Math.sin(angleRad) * spd);
-      fp.setCollideWorldBounds(true);
-      fp.body.onWorldBounds = true;
-      // Self-destruct after 1.5s
-      this.time.delayedCall(1500, () => { if (fp.active) fp.destroy(); });
+      const rad = Phaser.Math.DegToRad((i / NUM) * 360);
+      const spd = 380;
+      const fp  = this.add.image(x, y, 'poop').setScale(2).setDepth(5);
+      // Animate manually via tween since no physics body
+      const dur = 1200;
+      this.tweens.add({
+        targets: fp,
+        x: x + Math.cos(rad) * spd * (dur/1000),
+        y: y + Math.sin(rad) * spd * (dur/1000),
+        alpha: 0,
+        duration: dur,
+        ease: 'Linear',
+        onComplete: () => { fp.destroy(); }
+      });
     }
 
-    // Flash the fan hub
+    // Flash hub
     this.tweens.add({
-      targets: [this.fanHub, this.fanBladeContainer],
-      alpha: 0.2, duration: 60, yoyo: true, repeat: 5,
-      onComplete: () => {
-        if (this.fanHub) this.fanHub.alpha = 1;
-        if (this.fanBladeContainer) this.fanBladeContainer.alpha = 1;
-      }
+      targets: this.fanHubImg, alpha: 0.2, duration: 60,
+      yoyo: true, repeat: 5,
+      onComplete: () => { if (this.fanHubImg) this.fanHubImg.alpha = 1; }
+    });
+  }
+
+  nukeAllEnemies() {
+    // Award points for all enemies, but lock fan charge for 10s
+    const LOCKOUT_MS = 10000;
+    this.fanLockoutUntil = this.time.now + LOCKOUT_MS;
+    // Advance threshold so score gained during lockout doesn't immediately re-trigger
+    this.fanNextThresh = this.score + C.FAN_THRESHOLD;
+    this.enemies.getChildren().slice().forEach(enemy => {
+      if (!enemy.active) return;
+      this.addScore(enemy.points || 100, enemy.x, enemy.y - 20);
+      this.doSplat(enemy.x, enemy.y);
+      enemy.destroy();
+    });
+    this.forklifts.getChildren().slice().forEach(fl => {
+      if (!fl.active) return;
+      this.doSplat(fl.x, fl.y);
+      fl.destroy();
     });
   }
 
@@ -1254,21 +1402,34 @@ class GameScene extends Phaser.Scene {
   //  HUD
   // ─────────────────────────────────────────────────────────
   setupUI() {
-    this.scoreTxt = this.add.text(16, 16, 'SCORE: 0', {
-      fontFamily: 'monospace', fontSize: '18px', color: '#FCFC00',
+    // ── Row 1: Score (left) and Lives (right) — same y, same visual weight
+    this.scoreTxt = this.add.text(16, 12, 'SCORE: 0', {
+      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '18px', color: '#FFC425',
       stroke: '#000', strokeThickness: 3
     }).setDepth(20);
 
-    this.livesTxt = this.add.text(C.WIDTH - 16, 16, '❤❤❤', {
-      fontFamily: 'monospace', fontSize: '36px', color: '#FF4444',
-      stroke: '#000', strokeThickness: 4
+    this.livesTxt = this.add.text(C.WIDTH - 16, 10, '❤❤❤', {
+      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '20px', color: '#FF4444',
+      stroke: '#000', strokeThickness: 3
     }).setDepth(20).setOrigin(1, 0);
 
-    this.cdBarBg = this.add.rectangle(16, 52, 100, 8, 0x333333).setOrigin(0,0).setDepth(20);
-    this.cdBar   = this.add.rectangle(16, 52, 100, 8, 0xC8A000).setOrigin(0,0).setDepth(21);
-    this.add.text(16, 62, 'THROW', {
-      fontFamily:'monospace', fontSize:'10px', color:'#AAAAAA'
-    }).setDepth(20);
+    // ── Row 2: bars — identical spec, mirrored left/right
+    const BAR_Y = 38;
+    const BAR_W = 100;
+    const BAR_H = 8;
+    const LBL_Y = BAR_Y + BAR_H + 2;  // 48
+    const LBL_STYLE = { fontFamily:'industry, Arial Black, sans-serif', fontSize:'10px', color:'#FFFFFF', stroke:'#000', strokeThickness:2 };
+
+    // Left: THROW cooldown
+    this.cdBarBg = this.add.rectangle(16, BAR_Y, BAR_W, BAR_H, 0x333333).setOrigin(0,0).setDepth(20);
+    this.cdBar   = this.add.rectangle(16, BAR_Y, BAR_W, BAR_H, 0xFFC425).setOrigin(0,0).setDepth(21);
+    this.add.text(16, LBL_Y, 'THROW', LBL_STYLE).setDepth(20);
+
+    // Right: HEAT STRESS — right edge mirrors left bar's left edge
+    const fanBarX = C.WIDTH - 16 - BAR_W;
+    this.fanBarBg = this.add.rectangle(fanBarX, BAR_Y, BAR_W, BAR_H, 0x333333).setOrigin(0,0).setDepth(20);
+    this.fanBar   = this.add.rectangle(fanBarX, BAR_Y,      0, BAR_H, 0xFF3300).setOrigin(0,0).setDepth(21);
+    this.fanLabel = this.add.text(fanBarX, LBL_Y, 'HEAT STRESS 0%', LBL_STYLE).setDepth(20);
   }
 
   updateLivesDisplay() {
@@ -1278,7 +1439,7 @@ class GameScene extends Phaser.Scene {
   updateCooldownBar() {
     const frac = Math.min((this.time.now - this.lastThrow) / C.POOP_COOLDOWN, 1);
     this.cdBar.setDisplaySize(frac * 100, 8);
-    this.cdBar.setFillStyle(frac >= 1 ? 0x44FF44 : 0xC8A000);
+    this.cdBar.setFillStyle(frac >= 1 ? 0x44FF44 : 0xFFC425);
   }
 
   // ─────────────────────────────────────────────────────────
@@ -1310,9 +1471,12 @@ class GameScene extends Phaser.Scene {
 
     // Rotate poop
     this.poops.getChildren().forEach(p => { p.angle += 8; });
-    // Clean up off-screen enemies
+    // Clean up off-screen enemies and forklifts
     this.enemies.getChildren().forEach(e => {
-      if (e.x < -100 || e.x > C.WIDTH + 100) e.destroy();
+      if (e.x < -120 || e.x > C.WIDTH + 120) e.destroy();
+    });
+    this.forklifts.getChildren().forEach(fl => {
+      if (fl.x < -200 || fl.x > C.WIDTH + 200) fl.destroy();
     });
   }
 
@@ -1320,27 +1484,33 @@ class GameScene extends Phaser.Scene {
     this.enemies.getChildren().forEach(enemy => {
       if (!enemy.active || enemy.stunned) return;
 
-      // All enemies walk toward player
-      const toPlayer = this.player.x - enemy.x;
-      enemy.dir = toPlayer > 0 ? 1 : -1;
-      enemy.setFlipX(enemy.dir < 0);
-      enemy.setVelocityX(enemy.dir * enemy.speed);
+      if (enemy.randomWalk) {
+        // Workers walk straight across — no bouncing, destroyed when off-screen
+        enemy.setFlipX(enemy.dir < 0);
+        enemy.setVelocityX(enemy.dir * enemy.speed);
+      } else {
+        // All other enemies pursue player horizontally
+        const toPlayer = this.player.x - enemy.x;
+        enemy.dir = toPlayer > 0 ? 1 : -1;
+        enemy.setFlipX(enemy.dir < 0);
+        enemy.setVelocityX(enemy.dir * enemy.speed);
 
-      // Guard: shoot periodically
-      if (enemy.enemyType === 'guard') {
-        if (time - enemy.lastShot > enemy.shootDelay) {
-          enemy.lastShot    = time;
-          enemy.shootDelay  = Phaser.Math.Between(2500, 4500);
-          this.fireGuardShot(enemy);
+        // Guard: shoot toward player with arc aimed at their position
+        if (enemy.enemyType === 'guard') {
+          if (time - enemy.lastShot > enemy.shootDelay) {
+            enemy.lastShot   = time;
+            enemy.shootDelay = Phaser.Math.Between(2500, 4500);
+            this.fireGuardShot(enemy);
+          }
         }
-      }
 
-      // Manager: throw clipboard periodically
-      if (enemy.enemyType === 'manager') {
-        if (time - enemy.lastThrow > enemy.throwDelay) {
-          enemy.lastThrow  = time;
-          enemy.throwDelay = Phaser.Math.Between(2000, 3500);
-          this.throwManagerClipboard(enemy);
+        // Manager: throw clipboard aimed at player position
+        if (enemy.enemyType === 'manager') {
+          if (time - enemy.lastThrow > enemy.throwDelay) {
+            enemy.lastThrow  = time;
+            enemy.throwDelay = Phaser.Math.Between(2000, 3500);
+            this.throwManagerClipboard(enemy);
+          }
         }
       }
     });
@@ -1378,7 +1548,7 @@ class GameScene extends Phaser.Scene {
     this.addShelfUnit(550,  [410, 300]);
     this.addPallet(710, floorTop);
     this.addShelfUnit(870,  [390, 270, 160]);
-    this.addShelfSpanning(500, 155, 240);
+    // floating center shelf removed — was visually confused with fan mount
   }
 
   addShelfUnit(x, shelfYs) {
@@ -1426,17 +1596,17 @@ class GameOverScene extends Phaser.Scene {
     this.add.rectangle(W/2, H/2, W, H, 0x000000, 0.75);
 
     this.add.text(W/2, H/2 - 80, 'GAME OVER', {
-      fontFamily: 'monospace', fontSize: '52px', color: '#FF4444',
+      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '52px', color: '#FF4444',
       stroke: '#000', strokeThickness: 6
     }).setOrigin(0.5);
 
     this.add.text(W/2, H/2, 'SCORE: ' + (data.score || 0), {
-      fontFamily: 'monospace', fontSize: '28px', color: '#FCFC00',
+      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '28px', color: '#FFC425',
       stroke: '#000', strokeThickness: 4
     }).setOrigin(0.5);
 
     this.add.text(W/2, H/2 + 70, 'PRESS ENTER TO PLAY AGAIN', {
-      fontFamily: 'monospace', fontSize: '18px', color: '#FFFFFF',
+      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '18px', color: '#FFFFFF',
       stroke: '#000', strokeThickness: 3
     }).setOrigin(0.5);
 
@@ -1457,6 +1627,81 @@ class GameOverScene extends Phaser.Scene {
 }
 
 // ============================================================
+//  TITLE SCENE — Big Ass Fans branding
+// ============================================================
+class TitleScene extends Phaser.Scene {
+  constructor() { super('Title'); }
+
+  create() {
+    const W = C.WIDTH, H = C.HEIGHT;
+
+    // Background
+    this.add.rectangle(0, 0, W, H, 0xE9E9E9).setOrigin(0, 0);
+
+    // ── Text stack — centered
+    const textStyle = (size, bold) => ({
+      fontFamily: bold ? 'Arial Black, Arial' : 'Arial, sans-serif',
+      fontSize: size,
+      color: '#242424',
+      stroke: '#FFC425',
+      strokeThickness: 4,
+    });
+
+    this.add.text(W / 2, H / 2 - 120, 'BIG ASS FANS', {
+      ...textStyle('38px', true),
+      strokeThickness: 5,
+    }).setOrigin(0.5);
+
+    this.add.text(W / 2, H / 2 - 60, 'Presents', {
+      fontFamily: 'industry, Arial, sans-serif',
+      fontSize: '22px',
+      color: '#242424',
+      stroke: '#FFC425',
+      strokeThickness: 3,
+      fontStyle: 'italic',
+    }).setOrigin(0.5);
+
+    this.add.text(W / 2, H / 2 + 10, 'WAREHOUSE MAYHEM', {
+      fontFamily: 'industry, Arial Black, sans-serif',
+      fontSize: '52px',
+      color: '#242424',
+      stroke: '#FFC425',
+      strokeThickness: 7,
+    }).setOrigin(0.5);
+
+    // ── Play button
+    const btnW = 180, btnH = 56, btnX = W / 2, btnY = H / 2 + 175;
+
+    const btnBg = this.add.rectangle(btnX, btnY, btnW, btnH, 0xFFC425)
+      .setInteractive({ useHandCursor: true });
+
+    // Button border
+    const btnBorder = this.add.graphics();
+    btnBorder.lineStyle(3, 0x242424, 1);
+    btnBorder.strokeRect(btnX - btnW / 2, btnY - btnH / 2, btnW, btnH);
+
+    this.add.text(btnX, btnY, 'PLAY', {
+      fontFamily: 'industry, Arial Black, sans-serif',
+      fontSize: '28px',
+      color: '#242424',
+    }).setOrigin(0.5);
+
+    // Hover effect
+    btnBg.on('pointerover',  () => btnBg.setFillStyle(0xFFDB6E));
+    btnBg.on('pointerout',   () => btnBg.setFillStyle(0xFFC425));
+    btnBg.on('pointerdown',  () => {
+      btnBg.setFillStyle(0xCC9D1E);
+      this.time.delayedCall(120, () => this.scene.start('Game'));
+    });
+
+    // Also allow Enter key
+    this.input.keyboard.once('keydown-ENTER', () => this.scene.start('Game'));
+
+
+  }
+}
+
+// ============================================================
 //  PHASER CONFIG
 // ============================================================
 const config = {
@@ -1469,7 +1714,7 @@ const config = {
     default: 'arcade',
     arcade: { gravity: { y: C.GRAVITY }, debug: false }
   },
-  scene: [BootScene, GameScene, UIScene, GameOverScene],
+  scene: [BootScene, TitleScene, GameScene, UIScene, GameOverScene],
   parent: document.body,
   scale: {
     mode: Phaser.Scale.EXPAND,
