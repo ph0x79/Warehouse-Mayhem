@@ -34,24 +34,24 @@
 }
 #muteBtn:hover { background: #FFDB6E; }
 </style>
-<button id="muteBtn" onclick="toggleMute()">🔊 MUSIC</button>
+<button id="muteBtn" onclick="toggleMute()">🔇 MUSIC</button>
 <script>
   const music = document.getElementById('bgMusic');
-  // Start music on first user interaction (browser autoplay policy)
+  music.volume = 0.5;
+  music.muted = true;
   let musicStarted = false;
+
   function ensureMusic() {
     if (!musicStarted) {
       musicStarted = true;
-      music.volume = 0.5;
       music.play().catch(() => {});
     }
   }
-  document.addEventListener('click', ensureMusic, { once: false });
-  document.addEventListener('keydown', ensureMusic, { once: false });
 
   function toggleMute() {
     music.muted = !music.muted;
     document.getElementById('muteBtn').textContent = music.muted ? '🔇 MUSIC' : '🔊 MUSIC';
+    ensureMusic();
   }
 </script>
 <script>
@@ -91,6 +91,40 @@ const C = {
     STRIPE_YEL:  0xFFC425,
   }
 };
+
+// ============================================================
+//  SUPABASE CONFIG + LEADERBOARD HELPERS
+// ============================================================
+const SUPABASE_URL      = 'https://ecwklpzdwdcvhnqedbxl.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_0Byu_eEzc-Nb9pBzHaC24w_vdrjZa3b';
+const SCORES_ENDPOINT   = `${SUPABASE_URL}/rest/v1/scores`;
+
+async function submitScore(initials, score) {
+  try {
+    const res = await fetch(SCORES_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'apikey':        SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'Content-Type':  'application/json',
+        'Prefer':        'return=minimal'
+      },
+      body: JSON.stringify({ initials: initials.toUpperCase(), score })
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+async function fetchTopScores() {
+  try {
+    const res = await fetch(
+      `${SCORES_ENDPOINT}?select=initials,score&order=score.desc&limit=10`,
+      { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) return [];
+    return await res.json();
+  } catch { return []; }
+}
 
 // ============================================================
 //  BOOT SCENE — generates all textures programmatically
@@ -1347,17 +1381,17 @@ class GameScene extends Phaser.Scene {
     const isLocked = !this.fanSpinning && this.time.now < this.fanLockoutUntil;
     const secsLeft = Math.ceil((this.fanLockoutUntil - this.time.now) / 1000);
     const pct      = Math.min(Math.floor(frac * 100), 100);
-    this.fanBar.setDisplaySize(frac * 100, 8);
-    this.fanBar.setFillStyle(this.fanSpinning ? 0xFF0000 : (isLocked ? 0xFF6622 : 0xFF3300));
+    this.fanBar.setScale(Math.max(frac, 0), 1);
+    this.fanBar.setFillStyle(0xFF0000);
     if (this.fanSpinning) {
       this.fanLabel.setText('HEAT STRESS 100%');
       this.fanLabel.setColor('#FF0000');
     } else if (isLocked) {
       this.fanLabel.setText('HEAT STRESS ' + secsLeft + 's');
-      this.fanLabel.setColor('#FF8844');
+      this.fanLabel.setColor('#FFFFFF');
     } else {
       this.fanLabel.setText('HEAT STRESS ' + pct + '%');
-      this.fanLabel.setColor('#FFFFFF');
+      this.fanLabel.setColor(pct >= 100 ? '#FF0000' : '#FFFFFF');
     }
   }
 
@@ -1443,6 +1477,18 @@ class GameScene extends Phaser.Scene {
     this.input.on('pointerdown', (ptr) => {
       if (ptr.leftButtonDown()) this.throwPoop();
     });
+    this.input.keyboard.on('keydown-ESC', () => this.togglePause());
+  }
+
+  togglePause() {
+    if (!this.gameRunning) return;
+    if (this.scene.isActive('Pause')) {
+      this.scene.stop('Pause');
+      this.scene.resume('Game');
+    } else {
+      this.scene.pause('Game');
+      this.scene.launch('Pause');
+    }
   }
 
   // ─────────────────────────────────────────────────────────
@@ -1475,7 +1521,8 @@ class GameScene extends Phaser.Scene {
     // Right: HEAT STRESS — right edge mirrors left bar's left edge
     const fanBarX = C.WIDTH - 16 - BAR_W;
     this.fanBarBg = this.add.rectangle(fanBarX, BAR_Y, BAR_W, BAR_H, 0x333333).setOrigin(0,0).setDepth(20);
-    this.fanBar   = this.add.rectangle(fanBarX, BAR_Y,      0, BAR_H, 0xFF3300).setOrigin(0,0).setDepth(21);
+    this.fanBar   = this.add.rectangle(fanBarX, BAR_Y, BAR_W, BAR_H, 0xFF0000).setOrigin(0,0).setDepth(21);
+    this.fanBar.setScale(0, 1);
     this.fanLabel = this.add.text(fanBarX, LBL_Y, 'HEAT STRESS 0%', LBL_STYLE).setDepth(20);
   }
 
@@ -1499,7 +1546,7 @@ class GameScene extends Phaser.Scene {
     this.enemies.getChildren().forEach(e => e.setVelocity(0, 0));
     this.forklifts.getChildren().forEach(f => f.setVelocity(0, 0));
     this.time.delayedCall(1200, () => {
-      this.scene.start('GameOver', { score: this.score });
+      this.scene.start('EnterInitials', { score: this.score });
     });
   }
 
@@ -1641,36 +1688,152 @@ class GameOverScene extends Phaser.Scene {
 
   create(data) {
     const W = C.WIDTH, H = C.HEIGHT;
-    // Dark overlay
-    this.add.rectangle(W/2, H/2, W, H, 0x000000, 0.75);
+    this.add.rectangle(W/2, H/2, W, H, 0x000000, 0.85);
 
-    this.add.text(W/2, H/2 - 80, 'GAME OVER', {
+    this.add.text(W/2, H/2 - 100, 'GAME OVER', {
       fontFamily: 'industry, Arial Black, sans-serif', fontSize: '52px', color: '#FF4444',
       stroke: '#000', strokeThickness: 6
     }).setOrigin(0.5);
 
-    this.add.text(W/2, H/2, 'SCORE: ' + (data.score || 0), {
+    const initials = data.initials ? data.initials.trim() : '';
+    const scoreLine = initials
+      ? initials + '  \u2014  ' + (data.score || 0)
+      : 'SCORE: ' + (data.score || 0);
+    this.add.text(W/2, H/2 - 25, scoreLine, {
+      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '32px', color: '#FFC425',
+      stroke: '#000', strokeThickness: 4
+    }).setOrigin(0.5);
+
+    const prompt = this.add.text(W/2, H/2 + 70, 'PRESS ENTER TO RETURN TO TITLE', {
+      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '18px', color: '#FFFFFF',
+      stroke: '#000', strokeThickness: 3
+    }).setOrigin(0.5);
+    this.tweens.add({ targets: prompt, alpha: 0, duration: 500, yoyo: true, repeat: -1 });
+
+    this.input.keyboard.once('keydown-ENTER', () => { this.scene.start('Title'); });
+    this.input.once('pointerdown', () => { this.scene.start('Title'); });
+  }
+}
+
+// ============================================================
+//  ENTER INITIALS SCENE — arcade 3-letter entry
+// ============================================================
+class EnterInitialsScene extends Phaser.Scene {
+  constructor() { super('EnterInitials'); }
+
+  create(data) {
+    const W = C.WIDTH, H = C.HEIGHT;
+    this.finalScore = data.score || 0;
+    this.letters    = ['', '', ''];
+    this.cursor     = 0;
+    this.submitted  = false;
+
+    this.add.rectangle(W/2, H/2, W, H, 0x000000, 0.85);
+
+    this.add.text(W/2, 80, 'GAME OVER', {
+      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '52px', color: '#FF4444',
+      stroke: '#000', strokeThickness: 6
+    }).setOrigin(0.5);
+
+    this.add.text(W/2, 165, 'SCORE: ' + this.finalScore, {
       fontFamily: 'industry, Arial Black, sans-serif', fontSize: '28px', color: '#FFC425',
       stroke: '#000', strokeThickness: 4
     }).setOrigin(0.5);
 
-    this.add.text(W/2, H/2 + 70, 'PRESS ENTER TO PLAY AGAIN', {
-      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '18px', color: '#FFFFFF',
+    this.add.text(W/2, 265, 'ENTER YOUR INITIALS', {
+      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '20px', color: '#FFFFFF',
       stroke: '#000', strokeThickness: 3
     }).setOrigin(0.5);
 
-    // Blink the prompt
-    this.tweens.add({
-      targets: this.children.list[this.children.list.length - 1],
-      alpha: 0, duration: 500, yoyo: true, repeat: -1
+    // Three letter slots
+    this.slotTexts     = [];
+    this.slotUnderlines = [];
+    const slotCenters  = [W/2 - 80, W/2, W/2 + 80];
+    slotCenters.forEach((sx, i) => {
+      const txt = this.add.text(sx, 330, '_', {
+        fontFamily: 'proxima-nova, Arial, sans-serif', fontSize: '64px', color: '#FFC425',
+        stroke: '#000', strokeThickness: 4
+      }).setOrigin(0.5);
+      this.slotTexts.push(txt);
+      this.slotUnderlines.push(this.add.rectangle(sx, 378, 54, 4, 0xFFC425));
     });
 
-    this.input.keyboard.once('keydown-ENTER', () => {
-      this.scene.start('Game');
+    this.cursorTween = this.tweens.add({
+      targets: this.slotUnderlines[0], alpha: 0, duration: 400, yoyo: true, repeat: -1
     });
-    // Also allow clicking to restart
-    this.input.once('pointerdown', () => {
-      this.scene.start('Game');
+
+    const submitPrompt = this.add.text(W/2, 430, 'PRESS ENTER TO SUBMIT', {
+      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '16px', color: '#FFFFFF',
+      stroke: '#000', strokeThickness: 2
+    }).setOrigin(0.5);
+    this.tweens.add({ targets: submitPrompt, alpha: 0, duration: 500, yoyo: true, repeat: -1 });
+
+    this.add.text(W/2, 475, 'BACKSPACE TO CORRECT', {
+      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '14px', color: '#888888'
+    }).setOrigin(0.5);
+
+    this.input.keyboard.on('keydown', this.handleKey, this);
+  }
+
+  handleKey(event) {
+    if (this.submitted) return;
+    const key = event.key;
+
+    if (key === 'Enter') {
+      this.doSubmit();
+      return;
+    }
+
+    if (key === 'Backspace') {
+      if (this.cursor > 0 && this.letters[this.cursor] === '') {
+        this.cursor--;
+        this.letters[this.cursor] = '';
+      } else {
+        this.letters[this.cursor] = '';
+      }
+      this.refreshSlots();
+      return;
+    }
+
+    if (key.length === 1 && /^[a-zA-Z]$/.test(key) && this.cursor <= 2) {
+      this.letters[this.cursor] = key.toUpperCase();
+      if (this.cursor < 2) this.cursor++;
+      this.refreshSlots();
+    }
+  }
+
+  refreshSlots() {
+    this.slotTexts.forEach((txt, i) => txt.setText(this.letters[i] || '_'));
+    this.cursorTween.stop();
+    this.slotUnderlines.forEach((ul, i) => {
+      ul.setAlpha(1);
+      ul.setFillStyle(i === this.cursor ? 0xFFFFFF : 0xFFC425);
+    });
+    this.cursorTween = this.tweens.add({
+      targets: this.slotUnderlines[this.cursor], alpha: 0, duration: 400, yoyo: true, repeat: -1
+    });
+  }
+
+  doSubmit() {
+    if (this.submitted) return;
+    this.submitted = true;
+    this.input.keyboard.off('keydown', this.handleKey, this);
+    this.cursorTween.stop();
+
+    const initials = (
+      (this.letters[0] || ' ') +
+      (this.letters[1] || ' ') +
+      (this.letters[2] || ' ')
+    ).trim() || 'AAA';
+
+    this.add.text(C.WIDTH/2, 530, 'SUBMITTING...', {
+      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '16px', color: '#888888'
+    }).setOrigin(0.5);
+
+    submitScore(initials, this.finalScore).then(() => {
+      this.time.delayedCall(400, () => {
+        this.scene.start('GameOver', { score: this.finalScore, initials });
+      });
     });
   }
 }
@@ -1687,25 +1850,28 @@ class TitleScene extends Phaser.Scene {
     // Background
     this.add.rectangle(0, 0, W, H, 0xE9E9E9).setOrigin(0, 0);
 
-    // ── BAF Logo
-    this.add.image(W / 2, H / 2 - 230, 'baf_logo').setDisplaySize(130, 130).setOrigin(0.5);
+    // Left column center (shifted left to make room for leaderboard)
+    const lc = W / 4;  // 240
 
-    // ── Text stack — centered
+    // ── BAF Logo
+    this.add.image(lc, H / 2 - 230, 'baf_logo').setDisplaySize(130, 130).setOrigin(0.5);
+
+    // ── Text stack — left column
     const textStyle = (size, bold) => ({
-      fontFamily: bold ? 'Arial Black, Arial' : 'Arial, sans-serif',
+      fontFamily: bold ? 'industry, Arial Black, sans-serif' : 'proxima-nova, Arial, sans-serif',
       fontSize: size,
       color: '#242424',
       stroke: '#FFC425',
       strokeThickness: 4,
     });
 
-    this.add.text(W / 2, H / 2 - 120, 'BIG ASS FANS', {
+    this.add.text(lc, H / 2 - 120, 'BIG ASS FANS', {
       ...textStyle('38px', true),
       strokeThickness: 5,
     }).setOrigin(0.5);
 
-    this.add.text(W / 2, H / 2 - 60, 'Presents', {
-      fontFamily: 'industry, Arial, sans-serif',
+    this.add.text(lc, H / 2 - 60, 'Presents', {
+      fontFamily: 'proxima-nova, Arial, sans-serif',
       fontSize: '22px',
       color: '#242424',
       stroke: '#FFC425',
@@ -1713,16 +1879,16 @@ class TitleScene extends Phaser.Scene {
       fontStyle: 'italic',
     }).setOrigin(0.5);
 
-    this.add.text(W / 2, H / 2 + 10, 'WAREHOUSE MAYHEM', {
+    this.add.text(lc, H / 2 + 10, 'WAREHOUSE MAYHEM', {
       fontFamily: 'industry, Arial Black, sans-serif',
-      fontSize: '52px',
+      fontSize: '44px',
       color: '#242424',
       stroke: '#FFC425',
       strokeThickness: 7,
     }).setOrigin(0.5);
 
     // ── Play button
-    const btnW = 180, btnH = 56, btnX = W / 2, btnY = H / 2 + 175;
+    const btnW = 180, btnH = 56, btnX = lc, btnY = H / 2 + 175;
 
     const btnBg = this.add.rectangle(btnX, btnY, btnW, btnH, 0xFFC425)
       .setInteractive({ useHandCursor: true });
@@ -1749,7 +1915,84 @@ class TitleScene extends Phaser.Scene {
     // Also allow Enter key
     this.input.keyboard.once('keydown-ENTER', () => this.scene.start('Game'));
 
+    // ── Divider
+    const divG = this.add.graphics();
+    divG.lineStyle(2, 0xFFC425, 0.4);
+    divG.beginPath();
+    divG.moveTo(530, 60);
+    divG.lineTo(530, 580);
+    divG.strokePath();
 
+    // ── Right column: HIGH SCORES
+    const rc = 730;  // right column center
+
+    this.add.text(rc, 90, 'HIGH SCORES', {
+      fontFamily: 'industry, Arial Black, sans-serif',
+      fontSize: '22px', color: '#FFC425',
+      stroke: '#000', strokeThickness: 4
+    }).setOrigin(0.5);
+
+    const loadingTxt = this.add.text(rc, 200, 'LOADING...', {
+      fontFamily: 'industry, Arial Black, sans-serif',
+      fontSize: '14px', color: '#242424'
+    }).setOrigin(0.5);
+
+    fetchTopScores().then(scores => {
+      if (!this.scene.isActive('Title')) return;
+      loadingTxt.destroy();
+
+      if (scores.length === 0) {
+        this.add.text(rc, 200, 'NO SCORES YET', {
+          fontFamily: 'industry, Arial Black, sans-serif',
+          fontSize: '14px', color: '#242424'
+        }).setOrigin(0.5);
+        return;
+      }
+
+      scores.forEach((entry, idx) => {
+        const rowY    = 150 + idx * 46;
+        const rank    = String(idx + 1).padStart(2, ' ');
+        const initStr = (entry.initials || '???').padEnd(3, ' ');
+        const scoreStr = String(entry.score || 0).padStart(7, ' ');
+        const rowText  = `${rank}.  ${initStr}  ${scoreStr}`;
+        const col = '#242424';
+        this.add.text(rc, rowY, rowText, {
+          fontFamily: 'proxima-nova, Arial, sans-serif',
+          fontSize: '16px', color: col,
+          stroke: '#000', strokeThickness: 2
+        }).setOrigin(0.5);
+      });
+    });
+  }
+}
+
+// ============================================================
+//  PAUSE SCENE
+// ============================================================
+class PauseScene extends Phaser.Scene {
+  constructor() { super('Pause'); }
+
+  create() {
+    const W = C.WIDTH, H = C.HEIGHT;
+
+    this.add.rectangle(0, 0, W, H, 0xE9E9E9).setOrigin(0, 0);
+
+    this.add.text(W / 2, H / 2 - 80, 'PAUSED', {
+      fontFamily: 'industry, Arial Black, sans-serif',
+      fontSize: '64px', color: '#242424',
+      stroke: '#FFC425', strokeThickness: 6
+    }).setOrigin(0.5);
+
+    this.add.text(W / 2, H / 2 + 20, 'PRESS ESC TO RESUME', {
+      fontFamily: 'industry, Arial Black, sans-serif',
+      fontSize: '22px', color: '#242424',
+      stroke: '#FFC425', strokeThickness: 3
+    }).setOrigin(0.5);
+
+    this.input.keyboard.on('keydown-ESC', () => {
+      this.scene.stop('Pause');
+      this.scene.resume('Game');
+    });
   }
 }
 
@@ -1766,7 +2009,7 @@ const config = {
     default: 'arcade',
     arcade: { gravity: { y: C.GRAVITY }, debug: false }
   },
-  scene: [BootScene, TitleScene, GameScene, UIScene, GameOverScene],
+  scene: [BootScene, TitleScene, GameScene, UIScene, GameOverScene, EnterInitialsScene, PauseScene],
   parent: document.body,
   scale: {
     mode: Phaser.Scale.EXPAND,
