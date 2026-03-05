@@ -1104,7 +1104,7 @@ class GameScene extends Phaser.Scene {
         enemy.points      = 250;
         enemy.speed       = Phaser.Math.Between(80, 130);
         enemy.enemyType   = 'guard';
-        enemy.lastShot    = 0;
+        enemy.lastShot    = this.time.now;
         enemy.shootDelay  = Phaser.Math.Between(2500, 4000);
         break;
 
@@ -1114,7 +1114,7 @@ class GameScene extends Phaser.Scene {
         enemy.points      = 500;
         enemy.speed       = Phaser.Math.Between(70, 110);
         enemy.enemyType   = 'manager';
-        enemy.lastThrow   = 0;
+        enemy.lastThrow   = this.time.now;
         enemy.throwDelay  = Phaser.Math.Between(2000, 3500);
         break;
     }
