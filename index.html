@@ -11,7 +11,7 @@
 </style>
 </head>
 <body>
-<audio id="bgMusic" src="music/KMD1.mp3" loop preload="auto" style="display:none"></audio>
+<audio id="bgMusic" src="music/KMD6.mp3" loop preload="auto" style="display:none"></audio>
 <audio id="sfxBeepBeep" src="sounds/BEEPBEEP.wav" preload="auto" style="display:none"></audio>
 <audio id="sfxEbitda" src="sounds/EBITDA.wav" preload="auto" style="display:none"></audio>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
@@ -97,6 +97,10 @@ const C = {
 // ============================================================
 class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
+
+  preload() {
+    this.load.image('baf_logo', 'images/BAF.png');
+  }
 
   create() {
     this.makeWarehouseBackground();
@@ -775,6 +779,7 @@ class BootScene extends Phaser.Scene {
       g.destroy();
     }
   }
+
 }
 
 // ============================================================
@@ -1005,8 +1010,9 @@ class GameScene extends Phaser.Scene {
       this.hitEnemy(enemy);
     });
 
-    // Player touches any enemy → lose life
+    // Player touches any enemy → lose life (stunned enemies can't damage)
     this.physics.add.overlap(this.player, this.enemies, (player, enemy) => {
+      if (enemy.stunned) return;
       this.hurtPlayer();
     });
 
@@ -1054,10 +1060,14 @@ class GameScene extends Phaser.Scene {
     SFX.ebitda();
     this.updateLivesDisplay();
 
-    // Flash player red
+    // Flash player for visual feedback; iframes last exactly 1 second
     this.tweens.add({ targets: this.player, alpha: 0.2,
-      duration: 80, yoyo: true, repeat: 7,
-      onComplete: () => { this.player.alpha = 1; this.playerHurt = false; }
+      duration: 80, yoyo: true, repeat: -1
+    });
+    this.time.delayedCall(1000, () => {
+      this.tweens.killTweensOf(this.player);
+      this.player.alpha = 1;
+      this.playerHurt = false;
     });
 
     if (this.lives <= 0) this.triggerGameOver();
@@ -1653,6 +1663,9 @@ class TitleScene extends Phaser.Scene {
 
     // Background
     this.add.rectangle(0, 0, W, H, 0xE9E9E9).setOrigin(0, 0);
+
+    // ── BAF Logo
+    this.add.image(W / 2, H / 2 - 230, 'baf_logo').setDisplaySize(130, 130).setOrigin(0.5);
 
     // ── Text stack — centered
     const textStyle = (size, bold) => ({
