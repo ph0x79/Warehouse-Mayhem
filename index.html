@@ -12,6 +12,8 @@
 </head>
 <body>
 <audio id="bgMusic" src="music/KMD1.mp3" loop preload="auto" style="display:none"></audio>
+<audio id="sfxBeepBeep" src="sounds/BEEPBEEP.wav" preload="auto" style="display:none"></audio>
+<audio id="sfxEbitda" src="sounds/EBITDA.wav" preload="auto" style="display:none"></audio>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
 <style>
 #muteBtn {
@@ -871,6 +873,16 @@ const SFX = (() => {
         o.start(t); o.stop(t + 0.15);
       }
     }),
+
+    beepBeep: () => {
+      const el = document.getElementById('sfxBeepBeep');
+      if (el) { el.currentTime = 0; el.volume = 0.7; el.play().catch(() => {}); }
+    },
+
+    ebitda: () => {
+      const el = document.getElementById('sfxEbitda');
+      if (el) { el.currentTime = 0; el.volume = 0.8; el.play().catch(() => {}); }
+    },
   };
 })();
 
@@ -1039,6 +1051,7 @@ class GameScene extends Phaser.Scene {
     this.playerHurt = true;
     this.lives--;
     SFX.hit();
+    SFX.ebitda();
     this.updateLivesDisplay();
 
     // Flash player red
@@ -1122,6 +1135,7 @@ class GameScene extends Phaser.Scene {
     fl.dir = fromLeft ? 1 : -1;
     fl.setFlipX(fl.dir < 0);
     fl.setVelocityX(fl.dir * spd);
+    SFX.beepBeep();
   }
 
   fireGuardShot(guard) {
@@ -1497,7 +1511,8 @@ class GameScene extends Phaser.Scene {
 
         // Guard: shoot toward player with arc aimed at their position
         if (enemy.enemyType === 'guard') {
-          if (time - enemy.lastShot > enemy.shootDelay) {
+          const onScreen = enemy.x >= 0 && enemy.x <= C.WIDTH;
+          if (onScreen && time - enemy.lastShot > enemy.shootDelay) {
             enemy.lastShot   = time;
             enemy.shootDelay = Phaser.Math.Between(2500, 4500);
             this.fireGuardShot(enemy);
@@ -1506,7 +1521,8 @@ class GameScene extends Phaser.Scene {
 
         // Manager: throw clipboard aimed at player position
         if (enemy.enemyType === 'manager') {
-          if (time - enemy.lastThrow > enemy.throwDelay) {
+          const onScreen = enemy.x >= 0 && enemy.x <= C.WIDTH;
+          if (onScreen && time - enemy.lastThrow > enemy.throwDelay) {
             enemy.lastThrow  = time;
             enemy.throwDelay = Phaser.Math.Between(2000, 3500);
             this.throwManagerClipboard(enemy);
