@@ -34,7 +34,7 @@
 }
 #muteBtn:hover { background: #FFDB6E; }
 </style>
-<button id="muteBtn" onclick="toggleMute()">🔇 MUSIC</button>
+<button id="muteBtn" onclick="toggleMute()" tabindex="-1">🔇 MUSIC</button>
 <script>
   const music = document.getElementById('bgMusic');
   music.volume = 0.5;
@@ -1879,12 +1879,13 @@ class TitleScene extends Phaser.Scene {
       fontStyle: 'italic',
     }).setOrigin(0.5);
 
-    this.add.text(lc, H / 2 + 10, 'WAREHOUSE MAYHEM', {
+    this.add.text(lc, H / 2 + 10, 'WAREHOUSE\nMAYHEM', {
       fontFamily: 'industry, Arial Black, sans-serif',
-      fontSize: '44px',
+      fontSize: '48px',
       color: '#242424',
       stroke: '#FFC425',
       strokeThickness: 7,
+      align: 'center',
     }).setOrigin(0.5);
 
     // ── Play button
