@@ -1159,6 +1159,8 @@ class GameScene extends Phaser.Scene {
     const dart = this.hazards.create(ox, oy, 'dart');
     dart.setScale(2).setDepth(5);
     dart.body.setAllowGravity(true);
+    dart.setCollideWorldBounds(true);
+    dart.body.onWorldBounds = true;
     // Arc toward player, same compensation as chimp poop
     const dx = tx - ox, dy = ty - oy;
     const dist = Math.sqrt(dx*dx + dy*dy);
@@ -1167,6 +1169,13 @@ class GameScene extends Phaser.Scene {
     const vy   = (dy / dist) * spd - 0.5 * C.GRAVITY * (dist / spd);
     dart.setVelocity(vx, vy);
     dart.setFlipX(vx < 0);
+    const onDartBounds = (body) => {
+      if (body.gameObject === dart && dart.active) {
+        this.physics.world.off('worldbounds', onDartBounds);
+        dart.destroy();
+      }
+    };
+    this.physics.world.on('worldbounds', onDartBounds);
     this.time.delayedCall(3000, () => { if (dart.active) dart.destroy(); });
   }
 
@@ -1174,6 +1183,8 @@ class GameScene extends Phaser.Scene {
     const cb = this.hazards.create(manager.x, manager.y - 30, 'clipboard');
     cb.setScale(2).setDepth(5);
     cb.body.setAllowGravity(true);
+    cb.setCollideWorldBounds(true);
+    cb.body.onWorldBounds = true;
     const dx  = this.player.x - manager.x;
     const dy  = this.player.y - manager.y;
     const dist = Math.sqrt(dx*dx + dy*dy);
@@ -1182,6 +1193,13 @@ class GameScene extends Phaser.Scene {
     const vx2 = (dx/dist) * spd;
     const vy2 = (dy/dist) * spd - 0.5 * C.GRAVITY * (dist / spd);
     cb.setVelocity(vx2, vy2);
+    const onCbBounds = (body) => {
+      if (body.gameObject === cb && cb.active) {
+        this.physics.world.off('worldbounds', onCbBounds);
+        cb.destroy();
+      }
+    };
+    this.physics.world.on('worldbounds', onCbBounds);
     this.time.delayedCall(3000, () => { if (cb.active) cb.destroy(); });
   }
 
