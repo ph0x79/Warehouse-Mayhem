@@ -980,11 +980,13 @@ class GameScene extends Phaser.Scene {
     poop.setVelocity(vx, vy);
     poop.setCollideWorldBounds(true);
     poop.body.onWorldBounds = true;
-    this.physics.world.on('worldbounds', (body) => {
+    const onBounds = (body) => {
       if (body.gameObject === poop && poop.active) {
+        this.physics.world.off('worldbounds', onBounds);
         this.doSplat(poop.x, poop.y); poop.destroy();
       }
-    });
+    };
+    this.physics.world.on('worldbounds', onBounds);
   }
 
   doSplat(x, y, big = false) {
@@ -1047,6 +1049,9 @@ class GameScene extends Phaser.Scene {
           enemy.stunned = false;
           // Respawn at edge after stun
           enemy.x = Math.random() < 0.5 ? -30 : C.WIDTH + 30;
+          // Reset projectile timers so enemy doesn't fire immediately on re-entry
+          if (enemy.lastShot  !== undefined) enemy.lastShot  = this.time.now;
+          if (enemy.lastThrow !== undefined) enemy.lastThrow = this.time.now;
         }
       }
     });
