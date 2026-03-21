@@ -5,6 +5,7 @@
 <link rel="icon" href="data:,">
 <link rel="apple-touch-icon" href="data:,">
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Warehouse Mayhem</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1004,6 +1005,9 @@ class GameScene extends Phaser.Scene {
     this.lives       = 3;
     this.playerHurt  = false;   // brief invincibility after hit
     this.gameRunning = true;
+    this.touchLeft   = false;
+    this.touchRight  = false;
+    this.touchJump   = false;
     this.elapsed     = 0;       // seconds since start
 
     this.spawnPlayer();
@@ -1012,6 +1016,7 @@ class GameScene extends Phaser.Scene {
     this.setupFan();
     this.setupReticle();
     this.setupInput();
+    this.setupTouchControls();
     this.setupUI();
     this.setupSpawnTimer();
     this.bossSpawned = false;
@@ -1564,9 +1569,30 @@ class GameScene extends Phaser.Scene {
       arrowRight: Phaser.Input.Keyboard.KeyCodes.RIGHT,
     });
     this.input.on('pointerdown', (ptr) => {
-      if (ptr.leftButtonDown()) this.throwPoop();
+      if (ptr.leftButtonDown() || ptr.wasTouch) this.throwPoop();
     });
     this.input.keyboard.on('keydown-ESC', () => this.togglePause());
+  }
+
+  setupTouchControls() {
+    if (!this.sys.game.device.input.touch) return;
+    const BTN = 90, PAD = 20;
+    const btnY = C.HEIGHT - 64 - BTN / 2 - PAD;
+
+    const makeBtn = (x, y, label, onDown, onUp) => {
+      const bg = this.add.rectangle(x, y, BTN, BTN, 0xFFFFFF, 0.45)
+        .setDepth(50).setScrollFactor(0).setInteractive();
+      this.add.text(x, y, label, {
+        fontFamily: 'industry, Arial Black, sans-serif', fontSize: '32px', color: '#242424'
+      }).setOrigin(0.5).setDepth(51).setScrollFactor(0);
+      bg.on('pointerdown',  (ptr) => { ptr.event.stopPropagation(); onDown(); });
+      bg.on('pointerup',    () => onUp());
+      bg.on('pointerout',   () => onUp());
+    };
+
+    makeBtn(PAD + BTN/2,            btnY, '◀', () => { this.touchLeft  = true;  }, () => { this.touchLeft  = false; });
+    makeBtn(PAD + BTN + 12 + BTN/2, btnY, '▶', () => { this.touchRight = true;  }, () => { this.touchRight = false; });
+    makeBtn(C.WIDTH - PAD - BTN/2,  btnY, '▲', () => { this.touchJump  = true;  }, () => { this.touchJump  = false; });
   }
 
   togglePause() {
@@ -1630,6 +1656,7 @@ class GameScene extends Phaser.Scene {
   // ─────────────────────────────────────────────────────────
   triggerGameOver() {
     this.gameRunning = false;
+    this.touchLeft = this.touchRight = this.touchJump = false;
     SFX.gameOver();
     // Freeze all movement
     this.enemies.getChildren().forEach(e => e.setVelocity(0, 0));
@@ -1819,9 +1846,9 @@ class GameScene extends Phaser.Scene {
     const p        = this.player;
     const keys     = this.keys;
     const onFloor  = p.body.blocked.down;
-    const moveLeft  = keys.left.isDown  || keys.arrowLeft.isDown;
-    const moveRight = keys.right.isDown || keys.arrowRight.isDown;
-    const wantJump  = keys.up.isDown    || keys.arrowUp.isDown;
+    const moveLeft  = keys.left.isDown  || keys.arrowLeft.isDown  || this.touchLeft;
+    const moveRight = keys.right.isDown || keys.arrowRight.isDown || this.touchRight;
+    const wantJump  = keys.up.isDown    || keys.arrowUp.isDown    || this.touchJump;
 
     if (moveLeft)       { p.setVelocityX(-220); p.setFlipX(true);  }
     else if (moveRight) { p.setVelocityX( 220); p.setFlipX(false); }
@@ -1976,6 +2003,46 @@ class EnterInitialsScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     this.input.keyboard.on('keydown', this.handleKey, this);
+    if (this.sys.game.device.input.touch) this.setupTouchInitials();
+  }
+
+  setupTouchInitials() {
+    const W = C.WIDTH;
+    const slotCenters = [W/2 - 80, W/2, W/2 + 80];
+
+    // Tap a slot to cycle its letter A→B→...→Z→(blank)
+    slotCenters.forEach((sx, i) => {
+      this.add.rectangle(sx, 340, 70, 90, 0xFFFFFF, 0)
+        .setDepth(52).setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => {
+          if (this.submitted) return;
+          this.cursor = i;
+          const cur = this.letters[i];
+          if (!cur)             this.letters[i] = 'A';
+          else if (cur === 'Z') this.letters[i] = '';
+          else                  this.letters[i] = String.fromCharCode(cur.charCodeAt(0) + 1);
+          if (this.letters[i] && i < 2) this.cursor = i + 1;
+          this.refreshSlots();
+        });
+    });
+
+    const sy = 510;
+    // SUBMIT button
+    this.add.rectangle(W/2 + 70, sy, 120, 50, 0xFFC425).setDepth(52).setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => this.doSubmit());
+    this.add.text(W/2 + 70, sy, 'SUBMIT', {
+      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '18px', color: '#242424'
+    }).setOrigin(0.5).setDepth(53);
+
+    // CLEAR button
+    this.add.rectangle(W/2 - 70, sy, 120, 50, 0x444444).setDepth(52).setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => {
+        if (this.submitted) return;
+        this.letters = ['', '', '']; this.cursor = 0; this.refreshSlots();
+      });
+    this.add.text(W/2 - 70, sy, 'CLEAR', {
+      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '18px', color: '#FFFFFF'
+    }).setOrigin(0.5).setDepth(53);
   }
 
   handleKey(event) {
@@ -2187,13 +2254,17 @@ class PauseScene extends Phaser.Scene {
       stroke: '#FFC425', strokeThickness: 6
     }).setOrigin(0.5);
 
-    this.add.text(W / 2, H / 2 + 20, 'PRESS ESC TO RESUME', {
+    this.add.text(W / 2, H / 2 + 20, 'PRESS ESC OR TAP TO RESUME', {
       fontFamily: 'industry, Arial Black, sans-serif',
       fontSize: '22px', color: '#242424',
       stroke: '#FFC425', strokeThickness: 3
     }).setOrigin(0.5);
 
     this.input.keyboard.on('keydown-ESC', () => {
+      this.scene.stop('Pause');
+      this.scene.resume('Game');
+    });
+    this.input.once('pointerdown', () => {
       this.scene.stop('Pause');
       this.scene.resume('Game');
     });
