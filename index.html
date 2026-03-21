@@ -14,6 +14,7 @@
 <audio id="bgMusic" src="music/KMD6.mp3" loop preload="auto" style="display:none"></audio>
 <audio id="sfxBeepBeep" src="sounds/BEEPBEEP.wav" preload="auto" style="display:none"></audio>
 <audio id="sfxEbitda" src="sounds/EBITDA.wav" preload="auto" style="display:none"></audio>
+<audio id="sfxSitesDown" src="sounds/SITESDOWN.wav" preload="auto" style="display:none"></audio>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
 <style>
 #muteBtn {
@@ -625,6 +626,71 @@ class BootScene extends Phaser.Scene {
       g.destroy();
     }
 
+    // ── BOSS (bald, brown beard, black polo, khaki pants, boots)
+    {
+      const KHAKI = 0xC8A96E; const KHAKI_D = 0xA08050;
+      const POLO  = 0x111111; const POLO_D  = 0x000000;
+      const BEARD = 0x6B3A1F;
+      const g = this.make.graphics({ add: false });
+      // frame 0 — bald head (full skin top, no hat), brown beard
+      px(g, SKIN,   3,  0, 10, 13);
+      px(g, SKIN_D, 3, 12, 10,  1);
+      px(g, EYE,    5,  4,  2,  2);
+      px(g, EYE,    9,  4,  2,  2);
+      px(g, WHITE,  5,  4,  1,  1);
+      px(g, WHITE,  9,  4,  1,  1);
+      px(g, BEARD,  3,  8, 10,  5);
+      px(g, POLO,   3, 13, 10,  9);
+      px(g, POLO_D, 3, 13,  2,  9);
+      px(g, POLO_D,11, 13,  2,  9);
+      px(g, SKIN,   1, 14,  2,  7);
+      px(g, SKIN,  13, 14,  2,  7);
+      px(g, KHAKI,  4, 22,  4,  8);
+      px(g, KHAKI,  8, 19,  4,  8);
+      px(g, BOOT,   3, 29,  5,  3);
+      px(g, BOOT,   8, 26,  5,  3);
+      // frame 1
+      px(g, SKIN,  19,  0, 10, 13);
+      px(g, SKIN_D,19, 12, 10,  1);
+      px(g, EYE,   21,  4,  2,  2);
+      px(g, EYE,   25,  4,  2,  2);
+      px(g, WHITE, 21,  4,  1,  1);
+      px(g, WHITE, 25,  4,  1,  1);
+      px(g, BEARD, 19,  8, 10,  5);
+      px(g, POLO,  19, 13, 10,  9);
+      px(g, POLO_D,19, 13,  2,  9);
+      px(g, POLO_D,27, 13,  2,  9);
+      px(g, SKIN,  17, 14,  2,  7);
+      px(g, SKIN,  29, 14,  2,  7);
+      px(g, KHAKI, 20, 22,  4,  8);
+      px(g, KHAKI, 24, 19,  4,  8);
+      px(g, BOOT,  19, 29,  5,  3);
+      px(g, BOOT,  24, 26,  5,  3);
+      g.generateTexture('boss', 32, 34);
+      g.destroy();
+      this.textures.get('boss').add(0, 0,  0, 0, 16, 34);
+      this.textures.get('boss').add(1, 0, 16, 0, 16, 34);
+      this.anims.create({ key:'boss_walk',
+        frames:[{key:'boss',frame:0},{key:'boss',frame:1}],
+        frameRate:5, repeat:-1 });
+    }
+
+    // ── KEYBOARD — thrown by boss
+    {
+      const g = this.make.graphics({ add: false });
+      px(g, 0x555566,  0, 0, 14, 7);
+      px(g, 0x333344,  0, 6, 14, 1);
+      px(g, 0x8888AA,  1, 1,  2, 2);
+      px(g, 0x8888AA,  4, 1,  2, 2);
+      px(g, 0x8888AA,  7, 1,  2, 2);
+      px(g, 0x8888AA, 10, 1,  2, 2);
+      px(g, 0x8888AA,  2, 4,  2, 2);
+      px(g, 0x8888AA,  6, 4,  3, 2);
+      px(g, 0x8888AA, 10, 4,  2, 2);
+      g.generateTexture('keyboard', 14, 7);
+      g.destroy();
+    }
+
     // ── SCORE POP text textures (100, 150, 250, 500)
     // These are handled dynamically via text objects, no texture needed
   }
@@ -910,6 +976,11 @@ const SFX = (() => {
       const el = document.getElementById('sfxEbitda');
       if (el) { el.currentTime = 0; el.volume = 0.8; el.play().catch(() => {}); }
     },
+
+    sitesDown: () => {
+      const el = document.getElementById('sfxSitesDown');
+      if (el) { el.currentTime = 0; el.volume = 0.9; el.play().catch(() => {}); }
+    },
   };
 })();
 
@@ -941,6 +1012,8 @@ class GameScene extends Phaser.Scene {
     this.setupInput();
     this.setupUI();
     this.setupSpawnTimer();
+    this.bossSpawned = false;
+    this.boss        = null;
 
     this.physics.world.setBounds(0, 0, C.WIDTH, C.HEIGHT);
   }
@@ -1120,9 +1193,10 @@ class GameScene extends Phaser.Scene {
       case 'blade':
         enemy = this.enemies.create(spawnX, floorY, 'worker_blade');
         enemy.play('blade_walk');
-        enemy.points    = 150;
-        enemy.speed     = Phaser.Math.Between(50, 80);
-        enemy.enemyType = 'blade';
+        enemy.points     = 150;
+        enemy.speed      = Phaser.Math.Between(50, 80);
+        enemy.enemyType  = 'blade';
+        enemy.randomWalk = true;
         break;
 
       case 'guard':
@@ -1255,10 +1329,31 @@ class GameScene extends Phaser.Scene {
   }
 
   spawnNextEnemy() {
-    // Guard unlocks at 60s, manager at 2000 pts
-    const pool = ['worker', 'worker', 'blade'];
-    if (this.elapsed >= 60)  pool.push('guard', 'guard');
-    if (this.score  >= 2000) pool.push('manager');
+    const s = this.score;
+    const pool = [];
+
+    // Workers: 3 slots → 2 → 1 → gone at 3000
+    if      (s < 1000) pool.push('worker', 'worker', 'worker');
+    else if (s < 2000) pool.push('worker', 'worker');
+    else if (s < 3000) pool.push('worker');
+
+    // Blades: 2 slots → 1 → gone at 5000
+    if      (s < 2000) pool.push('blade', 'blade');
+    else if (s < 5000) pool.push('blade');
+
+    // Guards: unlock at 60s elapsed or 1000 pts; double slot at 5000+
+    if (this.elapsed >= 60 || s >= 1000) {
+      pool.push('guard');
+      if (s >= 5000) pool.push('guard');
+    }
+
+    // Managers: unlock at 2000; double slot at 5000+
+    if (s >= 2000) {
+      pool.push('manager');
+      if (s >= 5000) pool.push('manager');
+    }
+
+    if (pool.length === 0) pool.push('guard');
     const type = pool[Math.floor(Math.random() * pool.length)];
     this.spawnEnemy(type);
   }
@@ -1269,6 +1364,10 @@ class GameScene extends Phaser.Scene {
   addScore(pts, x, y) {
     this.score += pts;
     this.scoreTxt.setText('SCORE: ' + this.score);
+    if (this.score >= 10000 && !this.bossSpawned) {
+      this.bossSpawned = true;
+      this.spawnBoss();
+    }
 
     // Floating score pop
     const pop = this.add.text(x, y - 20, '+' + pts, {
@@ -1533,6 +1632,7 @@ class GameScene extends Phaser.Scene {
     // Freeze all movement
     this.enemies.getChildren().forEach(e => e.setVelocity(0, 0));
     this.forklifts.getChildren().forEach(f => f.setVelocity(0, 0));
+    if (this.boss && this.boss.active) { this.boss.setVelocity(0, 0); }
     this.time.delayedCall(1200, () => {
       this.scene.start('EnterInitials', { score: this.score });
     });
@@ -1550,6 +1650,7 @@ class GameScene extends Phaser.Scene {
     this.updateFan();
     this.tickSpawning(delta);
     this.updateEnemies(time, delta);
+    this.updateBoss(time);
 
     // Rotate poop
     this.poops.getChildren().forEach(p => { p.angle += 8; });
@@ -1598,6 +1699,118 @@ class GameScene extends Phaser.Scene {
         }
       }
     });
+  }
+
+  spawnBoss() {
+    const fromLeft   = Math.random() < 0.5;
+    const bossFloorY = C.HEIGHT - 64 - 51;  // scale 3: half-height = 17*3 = 51
+    const spawnX     = fromLeft ? -30 : C.WIDTH + 30;
+
+    this.boss = this.physics.add.sprite(spawnX, bossFloorY, 'boss');
+    this.boss.play('boss_walk');
+    this.boss.setScale(3).setDepth(4);
+    this.boss.setGravityY(0);
+    this.boss.setCollideWorldBounds(false);
+    this.boss.health     = 5;
+    this.boss.stunned    = false;
+    this.boss.dir        = fromLeft ? 1 : -1;
+    this.boss.speed      = 60;
+    this.boss.lastThrow  = this.time.now;
+    this.boss.throwDelay = 2000;
+    this.boss.setFlipX(this.boss.dir < 0);
+    this.physics.add.collider(this.boss, this.platforms);
+
+    this.physics.add.overlap(this.poops, this.boss, (poop, boss) => {
+      if (!poop.active || !boss.active || boss.stunned) return;
+      this.doSplat(poop.x, poop.y);
+      poop.destroy();
+      this.hitBoss();
+    });
+
+    SFX.sitesDown();
+    const alert = this.add.text(C.WIDTH / 2, C.HEIGHT / 2 - 40, '⚠ BOSS INCOMING ⚠', {
+      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '28px',
+      color: '#FF4444', stroke: '#000', strokeThickness: 5
+    }).setOrigin(0.5).setDepth(50);
+    this.tweens.add({ targets: alert, alpha: 0, y: alert.y - 40, duration: 2500,
+      onComplete: () => alert.destroy() });
+  }
+
+  hitBoss() {
+    if (!this.boss || !this.boss.active || this.boss.stunned) return;
+    SFX.splat();
+    this.boss.health -= 1;
+    this.boss.stunned = true;
+
+    this.tweens.add({
+      targets: this.boss, alpha: 0.3, duration: 100, yoyo: true, repeat: 4,
+      onComplete: () => {
+        if (!this.boss || !this.boss.active) return;
+        if (this.boss.health <= 0) {
+          this.addScore(2000, this.boss.x, this.boss.y - 30);
+          this.doSplat(this.boss.x, this.boss.y);
+          this.boss.destroy();
+          this.boss = null;
+          const msg = this.add.text(C.WIDTH / 2, C.HEIGHT / 2 - 40, 'BOSS DEFEATED!', {
+            fontFamily: 'industry, Arial Black, sans-serif', fontSize: '32px',
+            color: '#FFC425', stroke: '#000', strokeThickness: 5
+          }).setOrigin(0.5).setDepth(50);
+          this.tweens.add({ targets: msg, alpha: 0, y: msg.y - 50, duration: 2000,
+            onComplete: () => msg.destroy() });
+        } else {
+          this.boss.alpha  = 1;
+          this.boss.stunned = false;
+        }
+      }
+    });
+  }
+
+  throwBossKeyboard(boss) {
+    const kb = this.hazards.create(boss.x, boss.y - 30, 'keyboard');
+    kb.setScale(2).setDepth(5);
+    kb.body.setAllowGravity(true);
+    kb.setCollideWorldBounds(true);
+    kb.body.onWorldBounds = true;
+    const dx = this.player.x - boss.x;
+    const dy = this.player.y - boss.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const spd  = 380;
+    const vx   = (dx / dist) * spd;
+    const vy   = (dy / dist) * spd - 0.5 * C.GRAVITY * (dist / spd);
+    kb.setVelocity(vx, vy);
+    kb.setFlipX(vx < 0);
+    const onKbBounds = (body) => {
+      if (body.gameObject === kb && kb.active) {
+        this.physics.world.off('worldbounds', onKbBounds);
+        kb.destroy();
+      }
+    };
+    this.physics.world.on('worldbounds', onKbBounds);
+    this.time.delayedCall(3000, () => { if (kb.active) kb.destroy(); });
+  }
+
+  updateBoss(time) {
+    if (!this.boss || !this.boss.active || this.boss.stunned) return;
+
+    // Speed up while fan is spinning (charged and armed)
+    const currentSpeed = this.fanSpinning ? this.boss.speed * 1.5 : this.boss.speed;
+
+    const toPlayer = this.player.x - this.boss.x;
+    this.boss.dir = toPlayer > 0 ? 1 : -1;
+    this.boss.setFlipX(this.boss.dir < 0);
+    this.boss.setVelocityX(this.boss.dir * currentSpeed);
+
+    const onScreen = this.boss.x >= 0 && this.boss.x <= C.WIDTH;
+    if (onScreen && time - this.boss.lastThrow > this.boss.throwDelay) {
+      this.boss.lastThrow  = time;
+      this.boss.throwDelay = Phaser.Math.Between(1800, 3000);
+      this.throwBossKeyboard(this.boss);
+    }
+
+    if (this.boss.x < -200 || this.boss.x > C.WIDTH + 200) {
+      this.boss.destroy();
+      this.boss = null;
+    }
   }
 
   handlePlayerMovement() {
