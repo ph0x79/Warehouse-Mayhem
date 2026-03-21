@@ -1713,7 +1713,7 @@ class GameScene extends Phaser.Scene {
     this.boss.setScale(3).setDepth(4);
     this.boss.setGravityY(0);
     this.boss.setCollideWorldBounds(false);
-    this.boss.health     = 5;
+    this.boss.bossHP     = 5;
     this.boss.stunned    = false;
     this.boss.dir        = fromLeft ? 1 : -1;
     this.boss.speed      = 60;
@@ -1741,14 +1741,14 @@ class GameScene extends Phaser.Scene {
   hitBoss() {
     if (!this.boss || !this.boss.active || this.boss.stunned) return;
     SFX.splat();
-    this.boss.health -= 1;
+    this.boss.bossHP -= 1;
     this.boss.stunned = true;
 
     this.tweens.add({
       targets: this.boss, alpha: 0.3, duration: 100, yoyo: true, repeat: 4,
       onComplete: () => {
         if (!this.boss || !this.boss.active) return;
-        if (this.boss.health <= 0) {
+        if (this.boss.bossHP <= 0) {
           this.addScore(2000, this.boss.x, this.boss.y - 30);
           this.doSplat(this.boss.x, this.boss.y);
           this.boss.destroy();
