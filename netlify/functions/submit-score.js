@@ -32,7 +32,7 @@ export default async function handler(req, context) {
   }
 
   try {
-    const sql = neon(process.env.DATABASE_URL);
+    const sql = neon(process.env.NETLIFY_DATABASE_URL);
     await sql`INSERT INTO scores (initials, score) VALUES (${initials.trim().toUpperCase()}, ${score})`;
     return new Response(JSON.stringify({ ok: true }), {
       status: 201,

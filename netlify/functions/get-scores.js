@@ -6,7 +6,7 @@ export default async function handler(req, context) {
   }
 
   try {
-    const sql = neon(process.env.DATABASE_URL);
+    const sql = neon(process.env.NETLIFY_DATABASE_URL);
     const rows = await sql`SELECT initials, score FROM scores ORDER BY score DESC LIMIT 10`;
     return new Response(JSON.stringify(rows), {
       status: 200,
