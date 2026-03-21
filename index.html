@@ -93,22 +93,13 @@ const C = {
 };
 
 // ============================================================
-//  SUPABASE CONFIG + LEADERBOARD HELPERS
+//  NETLIFY DB — LEADERBOARD HELPERS
 // ============================================================
-const SUPABASE_URL      = 'https://ecwklpzdwdcvhnqedbxl.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_0Byu_eEzc-Nb9pBzHaC24w_vdrjZa3b';
-const SCORES_ENDPOINT   = `${SUPABASE_URL}/rest/v1/scores`;
-
 async function submitScore(initials, score) {
   try {
-    const res = await fetch(SCORES_ENDPOINT, {
+    const res = await fetch('/.netlify/functions/submit-score', {
       method: 'POST',
-      headers: {
-        'apikey':        SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'Content-Type':  'application/json',
-        'Prefer':        'return=minimal'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ initials: initials.toUpperCase(), score })
     });
     return res.ok;
@@ -117,10 +108,7 @@ async function submitScore(initials, score) {
 
 async function fetchTopScores() {
   try {
-    const res = await fetch(
-      `${SCORES_ENDPOINT}?select=initials,score&order=score.desc&limit=10`,
-      { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }
-    );
+    const res = await fetch('/.netlify/functions/get-scores');
     if (!res.ok) return [];
     return await res.json();
   } catch { return []; }
