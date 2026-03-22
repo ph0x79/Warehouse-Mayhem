@@ -1005,9 +1005,11 @@ class GameScene extends Phaser.Scene {
     this.lives       = 3;
     this.playerHurt  = false;   // brief invincibility after hit
     this.gameRunning = true;
-    this.touchLeft   = false;
-    this.touchRight  = false;
-    this.touchJump   = false;
+    this.touchLeft        = false;
+    this.touchRight       = false;
+    this.touchJump        = false;
+    this.joystickZone     = null;
+    this.joystickPointerId = -1;
     this.elapsed     = 0;       // seconds since start
 
     this.spawnPlayer();
@@ -1061,21 +1063,22 @@ class GameScene extends Phaser.Scene {
     });
   }
 
-  throwPoop() {
+  throwPoop(tx, ty) {
     if (!this.gameRunning) return;
     const now = this.time.now;
     if (now - this.lastThrow < C.POOP_COOLDOWN) return;
     this.lastThrow = now;
     SFX.throw();
 
-    const ptr  = this.input.activePointer;
     const px   = this.player.x;
     const py   = this.player.y - 10;
     const poop = this.poops.create(px, py, 'poop');
     poop.setScale(2).setDepth(5);
     poop.body.setAllowGravity(true);
 
-    const dx = ptr.x - px, dy = ptr.y - py;
+    const targetX = (tx !== undefined) ? tx : this.input.activePointer.x;
+    const targetY = (ty !== undefined) ? ty : this.input.activePointer.y;
+    const dx = targetX - px, dy = targetY - py;
     const dist = Math.sqrt(dx*dx + dy*dy);
     const vx = (dx/dist) * C.POOP_SPEED;
     const vy = (dy/dist) * C.POOP_SPEED - 0.5 * C.GRAVITY * (dist/C.POOP_SPEED);
@@ -1556,7 +1559,9 @@ class GameScene extends Phaser.Scene {
   // ─────────────────────────────────────────────────────────
   setupReticle() {
     this.reticle = this.add.image(0, 0, 'reticle').setScale(2).setDepth(10);
-    this.input.on('pointermove', (ptr) => { this.reticle.setPosition(ptr.x, ptr.y); });
+    this.input.on('pointermove', (ptr) => {
+      if (ptr.id !== this.joystickPointerId) this.reticle.setPosition(ptr.x, ptr.y);
+    });
   }
 
   setupInput() {
@@ -1569,30 +1574,77 @@ class GameScene extends Phaser.Scene {
       arrowRight: Phaser.Input.Keyboard.KeyCodes.RIGHT,
     });
     this.input.on('pointerdown', (ptr) => {
-      if (ptr.leftButtonDown() || ptr.wasTouch) this.throwPoop();
+      if (this.joystickZone) {
+        const jdx = ptr.x - this.joystickZone.x;
+        const jdy = ptr.y - this.joystickZone.y;
+        if (jdx * jdx + jdy * jdy <= this.joystickZone.r * this.joystickZone.r) return;
+      }
+      if (ptr.leftButtonDown() || ptr.wasTouch) this.throwPoop(ptr.x, ptr.y);
     });
     this.input.keyboard.on('keydown-ESC', () => this.togglePause());
   }
 
   setupTouchControls() {
     if (!this.sys.game.device.input.touch) return;
-    const BTN = 90, PAD = 20;
-    const btnY = C.HEIGHT - 64 - BTN / 2 - PAD;
 
-    const makeBtn = (x, y, label, onDown, onUp) => {
-      const bg = this.add.rectangle(x, y, BTN, BTN, 0xFFFFFF, 0.45)
-        .setDepth(50).setScrollFactor(0).setInteractive();
-      this.add.text(x, y, label, {
-        fontFamily: 'industry, Arial Black, sans-serif', fontSize: '32px', color: '#242424'
-      }).setOrigin(0.5).setDepth(51).setScrollFactor(0);
-      bg.on('pointerdown',  (ptr) => { ptr.event.stopPropagation(); onDown(); });
-      bg.on('pointerup',    () => onUp());
-      bg.on('pointerout',   () => onUp());
+    const CX = 95, CY = C.HEIGHT - 90;  // joystick center (bottom-left)
+    const R  = 78;                        // visual radius
+    const DEAD = 20;                      // dead-zone radius
+
+    this.joystickZone = { x: CX, y: CY, r: R };
+
+    // Outer ring
+    const gfx = this.add.graphics().setDepth(50).setScrollFactor(0);
+    gfx.fillStyle(0xFFFFFF, 0.12);
+    gfx.fillCircle(CX, CY, R);
+    gfx.lineStyle(2, 0xFFFFFF, 0.35);
+    gfx.strokeCircle(CX, CY, R);
+
+    // Arrow hints
+    const hintStyle = { fontSize: '14px', color: '#ffffff', alpha: 0.5 };
+    this.add.text(CX - R + 10, CY,      '◀', hintStyle).setOrigin(0.5).setDepth(51).setScrollFactor(0);
+    this.add.text(CX + R - 10, CY,      '▶', hintStyle).setOrigin(0.5).setDepth(51).setScrollFactor(0);
+    this.add.text(CX,          CY - R + 10, '▲', hintStyle).setOrigin(0.5).setDepth(51).setScrollFactor(0);
+
+    // Movable thumb
+    const thumbGfx = this.add.graphics().setDepth(52).setScrollFactor(0);
+    const drawThumb = (tx, ty) => {
+      thumbGfx.clear();
+      thumbGfx.fillStyle(0xFFFFFF, 0.35);
+      thumbGfx.fillCircle(tx, ty, 26);
+    };
+    drawThumb(CX, CY);
+
+    // Update flags and thumb from pointer position
+    const update = (ptr) => {
+      const dx = ptr.x - CX;
+      const dy = ptr.y - CY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const scale = dist > R ? R / dist : 1;
+      drawThumb(CX + dx * scale, CY + dy * scale);
+      this.touchLeft  = dx < -DEAD;
+      this.touchRight = dx >  DEAD;
+      this.touchJump  = dy < -DEAD;
     };
 
-    makeBtn(PAD + BTN/2,            btnY, '◀', () => { this.touchLeft  = true;  }, () => { this.touchLeft  = false; });
-    makeBtn(PAD + BTN + 12 + BTN/2, btnY, '▶', () => { this.touchRight = true;  }, () => { this.touchRight = false; });
-    makeBtn(C.WIDTH - PAD - BTN/2,  btnY, '▲', () => { this.touchJump  = true;  }, () => { this.touchJump  = false; });
+    const release = () => {
+      this.joystickPointerId = -1;
+      this.touchLeft = this.touchRight = this.touchJump = false;
+      drawThumb(CX, CY);
+    };
+
+    // Invisible hit circle (slightly larger for easier touch)
+    this.add.circle(CX, CY, R + 8, 0xFFFFFF, 0)
+      .setDepth(53).setScrollFactor(0).setInteractive()
+      .on('pointerdown', (ptr) => { this.joystickPointerId = ptr.id; update(ptr); });
+
+    // Track drag and release at scene level (handles movement outside hit circle)
+    this.input.on('pointermove', (ptr) => {
+      if (ptr.id === this.joystickPointerId) update(ptr);
+    });
+    this.input.on('pointerup', (ptr) => {
+      if (ptr.id === this.joystickPointerId) release();
+    });
   }
 
   togglePause() {
@@ -1657,6 +1709,7 @@ class GameScene extends Phaser.Scene {
   triggerGameOver() {
     this.gameRunning = false;
     this.touchLeft = this.touchRight = this.touchJump = false;
+    this.joystickPointerId = -1;
     SFX.gameOver();
     // Freeze all movement
     this.enemies.getChildren().forEach(e => e.setVelocity(0, 0));
