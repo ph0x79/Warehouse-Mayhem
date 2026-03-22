@@ -2008,41 +2008,47 @@ class EnterInitialsScene extends Phaser.Scene {
 
   setupTouchInitials() {
     const W = C.WIDTH;
-    const slotCenters = [W/2 - 80, W/2, W/2 + 80];
 
-    // Tap a slot to cycle its letter A→B→...→Z→(blank)
-    slotCenters.forEach((sx, i) => {
-      this.add.rectangle(sx, 340, 70, 90, 0xFFFFFF, 0)
-        .setDepth(52).setInteractive({ useHandCursor: true })
-        .on('pointerdown', () => {
-          if (this.submitted) return;
-          this.cursor = i;
-          const cur = this.letters[i];
-          if (!cur)             this.letters[i] = 'A';
-          else if (cur === 'Z') this.letters[i] = '';
-          else                  this.letters[i] = String.fromCharCode(cur.charCodeAt(0) + 1);
-          if (this.letters[i] && i < 2) this.cursor = i + 1;
-          this.refreshSlots();
-        });
-    });
+    // Dark strip covering keyboard-only hint texts that don't apply on touch
+    this.add.rectangle(W / 2, 490, W, 160, 0x111111, 0.95).setDepth(51);
 
-    const sy = 510;
-    // SUBMIT button
-    this.add.rectangle(W/2 + 70, sy, 120, 50, 0xFFC425).setDepth(52).setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => this.doSubmit());
-    this.add.text(W/2 + 70, sy, 'SUBMIT', {
-      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '18px', color: '#242424'
-    }).setOrigin(0.5).setDepth(53);
+    const rows = [
+      ['A','B','C','D','E','F','G','H','I'],
+      ['J','K','L','M','N','O','P','Q','R'],
+      ['S','T','U','V','W','X','Y','Z','DEL','DONE'],
+    ];
 
-    // CLEAR button
-    this.add.rectangle(W/2 - 70, sy, 120, 50, 0x444444).setDepth(52).setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => {
-        if (this.submitted) return;
-        this.letters = ['', '', '']; this.cursor = 0; this.refreshSlots();
+    const startY = 440;
+    const rowH   = 50;
+
+    rows.forEach((keys, row) => {
+      const n      = keys.length;
+      const btnW   = Math.floor(920 / n);
+      const startX = (W - btnW * n) / 2;
+
+      keys.forEach((k, col) => {
+        const x      = startX + col * btnW + btnW / 2;
+        const y      = startY + row * rowH;
+        const isDone = k === 'DONE';
+        const isDel  = k === 'DEL';
+        const bg     = isDone ? 0xFFC425 : (isDel ? 0x666666 : 0x333333);
+        const fg     = isDone ? '#242424' : '#FFFFFF';
+        const fs     = (isDone || isDel) ? '14px' : '18px';
+
+        this.add.rectangle(x, y, btnW - 4, 42, bg, 0.95)
+          .setDepth(52).setInteractive({ useHandCursor: true })
+          .on('pointerdown', () => {
+            if (this.submitted) return;
+            if (isDel)       this.handleKey({ key: 'Backspace' });
+            else if (isDone) this.doSubmit();
+            else             this.handleKey({ key: k });
+          });
+
+        this.add.text(x, y, k, {
+          fontFamily: 'industry, Arial Black, sans-serif', fontSize: fs, color: fg
+        }).setOrigin(0.5).setDepth(53);
       });
-    this.add.text(W/2 - 70, sy, 'CLEAR', {
-      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '18px', color: '#FFFFFF'
-    }).setOrigin(0.5).setDepth(53);
+    });
   }
 
   handleKey(event) {
@@ -2278,6 +2284,7 @@ const config = {
   type: Phaser.AUTO,
   width:  C.WIDTH,
   height: C.HEIGHT,
+  input: { activePointers: 3 },
   backgroundColor: '#000000',
   pixelArt: true,        // disables anti-aliasing globally
   physics: {
