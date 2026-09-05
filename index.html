@@ -43,19 +43,11 @@
   const music = document.getElementById('bgMusic');
   music.volume = 0.5;
   music.muted = true;
-  let musicStarted = false;
-
-  function ensureMusic() {
-    if (!musicStarted) {
-      musicStarted = true;
-      music.play().catch(() => {});
-    }
-  }
 
   function toggleMute() {
     music.muted = !music.muted;
     document.getElementById('muteBtn').textContent = music.muted ? '🔇 MUSIC' : '🔊 MUSIC';
-    ensureMusic();
+    music.play().catch(() => {});
   }
 </script>
 <script>
@@ -70,12 +62,9 @@ const C = {
   POOP_SPEED:      520,
   SPAWN_RATE_BASE: 3000,   // ms between enemy spawns (decreases over time)
   FAN_THRESHOLD:   1000,   // score points to charge the fan
-  MUSIC_TRACKS:    [],     // e.g. ['music/track1.mp3', 'music/track2.mp3']
 
   // NES-ish palette
   COL: {
-    BLACK:       0x000000,
-    WHITE:       0xFCFCFC,
     CONCRETE:    0x7C7C7C,
     CONCRETE_D:  0x585858,
     CONCRETE_L:  0xBCBCBC,
@@ -86,13 +75,11 @@ const C = {
     BOX_DARK:    0x885820,
     BOX_SHADE:   0xA86828,
     HAZARD_YEL:  0xFFC425,
-    HAZARD_BLK:  0x282828,
     PALLET:      0xB87840,
     PALLET_D:    0x805030,
     SKY_CEIL:    0x283050,   // ceiling/upper bg
     WALL:        0x5C6070,
     WALL_D:      0x404550,
-    STRIPE_YEL:  0xFFC425,
   }
 };
 
@@ -121,6 +108,10 @@ async function fetchTopScores() {
 // ============================================================
 //  BOOT SCENE — generates all textures programmatically
 // ============================================================
+
+// Draw a pixel rect on a graphics object.
+const px = (g, col, x, y, w, h) => { g.fillStyle(col, 1); g.fillRect(x, y, w, h); };
+
 class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
 
@@ -138,37 +129,31 @@ class BootScene extends Phaser.Scene {
     this.scene.start('Title');
   }
 
-  // ── Helper: draw a pixel rect on a graphics object
-  px(g, color, x, y, w, h) {
-    g.fillStyle(color, 1);
-    g.fillRect(x, y, w, h);
-  }
-
   makeWarehouseBackground() {
     const g = this.make.graphics({ x: 0, y: 0, add: false });
     const W = C.WIDTH, H = C.HEIGHT;
 
     // Ceiling band
-    this.px(g, C.COL.SKY_CEIL,    0,  0, W,  60);
+    px(g, C.COL.SKY_CEIL,    0,  0, W,  60);
     // Ceiling edge trim
-    this.px(g, C.COL.CONCRETE_D,  0, 58, W,   4);
+    px(g, C.COL.CONCRETE_D,  0, 58, W,   4);
 
     // Back wall
-    this.px(g, C.COL.WALL, 0, 60, W, H - 60);
+    px(g, C.COL.WALL, 0, 60, W, H - 60);
 
     // Subtle wall panel lines (vertical)
     for (let x = 0; x < W; x += 80) {
-      this.px(g, C.COL.WALL_D, x, 60, 2, H - 120);
+      px(g, C.COL.WALL_D, x, 60, 2, H - 120);
     }
     // Horizontal panel lines
     for (let y = 60; y < H - 80; y += 90) {
-      this.px(g, C.COL.WALL_D, 0, y, W, 2);
+      px(g, C.COL.WALL_D, 0, y, W, 2);
     }
 
     // Floor
-    this.px(g, C.COL.CONCRETE,   0, H - 64, W, 64);
-    this.px(g, C.COL.CONCRETE_L, 0, H - 64, W,  4); // floor highlight
-    this.px(g, C.COL.CONCRETE_D, 0, H - 4,  W,  4); // floor shadow
+    px(g, C.COL.CONCRETE,   0, H - 64, W, 64);
+    px(g, C.COL.CONCRETE_L, 0, H - 64, W,  4); // floor highlight
+    px(g, C.COL.CONCRETE_D, 0, H - 4,  W,  4); // floor shadow
 
     // Hazard stripes on floor
     const stripeW = 28;
@@ -176,13 +161,13 @@ class BootScene extends Phaser.Scene {
       // Draw angled stripe as a series of horizontal slices
       for (let row = 0; row < 64; row++) {
         const offset = Math.floor(row * 0.8);
-        this.px(g, C.COL.HAZARD_YEL, x + offset, H - 64 + row, stripeW, 1);
+        px(g, C.COL.HAZARD_YEL, x + offset, H - 64 + row, stripeW, 1);
       }
     }
     // Overlay floor base color semi-opaque — use separate rects for grid look
     // Floor grid lines
     for (let x = 0; x < W; x += 64) {
-      this.px(g, C.COL.CONCRETE_D, x, H - 64, 1, 64);
+      px(g, C.COL.CONCRETE_D, x, H - 64, 1, 64);
     }
 
     g.generateTexture('background', W, H);
@@ -347,7 +332,6 @@ class BootScene extends Phaser.Scene {
   }
 
   makePoopTextures() {
-    const px = (g, col, x, y, w, h) => { g.fillStyle(col, 1); g.fillRect(x, y, w, h); };
     const POOP_BR  = 0x5C3010;
     const POOP_L   = 0x7A4820;
     const POOP_D   = 0x3A1C08;
@@ -412,7 +396,6 @@ class BootScene extends Phaser.Scene {
   }
 
   makeEnemyTextures() {
-    const px = (g, col, x, y, w, h) => { g.fillStyle(col, 1); g.fillRect(x, y, w, h); };
 
     // Shared human body colors
     const SKIN   = 0xFFCCA0;
@@ -699,7 +682,6 @@ class BootScene extends Phaser.Scene {
   }
 
   makeFanTextures() {
-    const px = (g, col, x, y, w, h) => { g.fillStyle(col, 1); g.fillRect(x, y, w, h); };
 
     // ── FAN HUB — larger, industrial motor housing (28x28) matching Powerfoil X4 scale
     {
@@ -771,7 +753,6 @@ class BootScene extends Phaser.Scene {
       px(g, TIP_D,64, 12, 12,  2);   // tip shadow
       // Rounded tip — clip corners pixel-art style
       px(g, TIP,  64,  4,  2,  1);   // shave top-left corner of tip
-      px(g, 0x000000, 76, 4, 0, 0);  // noop boundary
 
       // Attachment bolt on arm
       px(g, 0x5A5A6E, 4, 7, 3, 4);
@@ -807,14 +788,14 @@ class BootScene extends Phaser.Scene {
       const W = 200, H = 16;
       const g = this.make.graphics({ add: false });
       // Top highlight
-      this.px(g, C.COL.SHELF_LIGHT, 0,  0, W,  3);
+      px(g, C.COL.SHELF_LIGHT, 0,  0, W,  3);
       // Main shelf body
-      this.px(g, C.COL.SHELF_METAL, 0,  3, W,  8);
+      px(g, C.COL.SHELF_METAL, 0,  3, W,  8);
       // Shelf shadow
-      this.px(g, C.COL.SHELF_DARK,  0, 11, W,  5);
+      px(g, C.COL.SHELF_DARK,  0, 11, W,  5);
       // Rivets
       for (let x = 12; x < W - 12; x += 40) {
-        this.px(g, C.COL.CONCRETE_L, x, 5, 3, 3);
+        px(g, C.COL.CONCRETE_L, x, 5, 3, 3);
       }
       g.generateTexture('shelf', W, H);
       g.destroy();
@@ -824,15 +805,14 @@ class BootScene extends Phaser.Scene {
     {
       const S = 40;
       const g = this.make.graphics({ add: false });
-      this.px(g, C.COL.BOX_TAN,   0,  0, S,   S);
-      this.px(g, C.COL.BOX_SHADE, 0,  0, S,   4);  // top shade
-      this.px(g, C.COL.BOX_DARK,  0, S-4, S,  4);  // bottom shadow
-      this.px(g, C.COL.BOX_DARK,  S-4, 0, 4,  S);  // right shadow
+      px(g, C.COL.BOX_TAN,   0,  0, S,   S);
+      px(g, C.COL.BOX_SHADE, 0,  0, S,   4);  // top shade
+      px(g, C.COL.BOX_DARK,  0, S-4, S,  4);  // bottom shadow
+      px(g, C.COL.BOX_DARK,  S-4, 0, 4,  S);  // right shadow
       // X cross on box face
       for (let i = 4; i < S - 4; i++) {
-        const t = Math.floor(i * (S - 8) / (S - 8));
-        this.px(g, C.COL.BOX_DARK, i, i, 2, 2);
-        this.px(g, C.COL.BOX_DARK, S - 1 - i, i, 2, 2);
+        px(g, C.COL.BOX_DARK, i, i, 2, 2);
+        px(g, C.COL.BOX_DARK, S - 1 - i, i, 2, 2);
       }
       g.generateTexture('box', S, S);
       g.destroy();
@@ -844,13 +824,13 @@ class BootScene extends Phaser.Scene {
       const g = this.make.graphics({ add: false });
       // Boards
       for (let x = 0; x < W; x += 16) {
-        this.px(g, C.COL.PALLET,   x,  0, 14,  H);
-        this.px(g, C.COL.PALLET_D, x + 12, 0,  2, H);
+        px(g, C.COL.PALLET,   x,  0, 14,  H);
+        px(g, C.COL.PALLET_D, x + 12, 0,  2, H);
       }
       // Top slats
-      this.px(g, C.COL.PALLET,   0, 0, W, 3);
-      this.px(g, C.COL.PALLET,   0, 6, W, 3);
-      this.px(g, C.COL.PALLET_D, 0, H-2, W, 2);
+      px(g, C.COL.PALLET,   0, 0, W, 3);
+      px(g, C.COL.PALLET,   0, 6, W, 3);
+      px(g, C.COL.PALLET_D, 0, H-2, W, 2);
       g.generateTexture('pallet', W, H);
       g.destroy();
     }
@@ -859,12 +839,12 @@ class BootScene extends Phaser.Scene {
     {
       const W = 12, H = 200;
       const g = this.make.graphics({ add: false });
-      this.px(g, C.COL.SHELF_METAL, 0, 0, W, H);
-      this.px(g, C.COL.SHELF_LIGHT, 1, 0, 3, H);
-      this.px(g, C.COL.SHELF_DARK,  W-3, 0, 3, H);
+      px(g, C.COL.SHELF_METAL, 0, 0, W, H);
+      px(g, C.COL.SHELF_LIGHT, 1, 0, 3, H);
+      px(g, C.COL.SHELF_DARK,  W-3, 0, 3, H);
       // Bolt holes
       for (let y = 16; y < H; y += 32) {
-        this.px(g, C.COL.SHELF_DARK, 4, y, 4, 4);
+        px(g, C.COL.SHELF_DARK, 4, y, 4, 4);
       }
       g.generateTexture('shelf_upright', W, H);
       g.destroy();
@@ -1024,6 +1004,8 @@ class GameScene extends Phaser.Scene {
     this.bossSpawned = false;
     this.boss        = null;
 
+    // Pin world bounds to the design size. Redundant while scale.mode is NONE, but
+    // projectile cleanup rides on onWorldBounds — don't let a scale change move them.
     this.physics.world.setBounds(0, 0, C.WIDTH, C.HEIGHT);
   }
 
@@ -1034,14 +1016,12 @@ class GameScene extends Phaser.Scene {
     const spawnY = C.HEIGHT - 64 - 40;
     this.player = this.physics.add.sprite(120, spawnY, 'chimp');
     this.player.setCollideWorldBounds(true);
-    this.player.setGravityY(0);
     this.player.body.setMaxVelocityY(800);
     this.player.setDragX(1200);
     this.player.setSize(18, 38);
     this.player.setOffset(5, 4);
     this.player.setScale(2);
-    this.physics.add.collider(this.player, this.platforms);
-    this.physics.add.collider(this.player, this.pallets);
+    this.physics.add.collider(this.player, [this.platforms, this.pallets]);
     this.player.play('chimp_idle');
     this.jumpLocked = false;
   }
@@ -1053,14 +1033,35 @@ class GameScene extends Phaser.Scene {
     this.poops     = this.physics.add.group();
     this.lastThrow = -C.POOP_COOLDOWN;
 
-    this.physics.add.collider(this.poops, this.platforms, (poop) => {
+    this.physics.add.collider(this.poops, [this.platforms, this.pallets], (poop) => {
       this.doSplat(poop.x, poop.y);
       poop.destroy();
     });
-    this.physics.add.collider(this.poops, this.pallets, (poop) => {
-      this.doSplat(poop.x, poop.y);
-      poop.destroy();
-    });
+  }
+
+  // Lob a sprite from (ox,oy) toward (tx,ty) on a gravity-compensated arc.
+  // opts: flip = face travel direction, ttl = auto-destroy ms, splat = splat on world bounds.
+  lob(group, tex, ox, oy, tx, ty, spd, opts = {}) {
+    const s    = group.create(ox, oy, tex);
+    const dx   = tx - ox, dy = ty - oy;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const vx   = (dx/dist) * spd;
+    const vy   = (dy/dist) * spd - 0.5 * C.GRAVITY * (dist/spd);
+    s.setScale(2).setDepth(5);
+    s.setVelocity(vx, vy);
+    if (opts.flip) s.setFlipX(vx < 0);
+    s.setCollideWorldBounds(true);
+    s.body.onWorldBounds = true;
+    const onBounds = (body) => {
+      if (body.gameObject === s && s.active) {
+        this.physics.world.off('worldbounds', onBounds);
+        if (opts.splat) this.doSplat(s.x, s.y);
+        s.destroy();
+      }
+    };
+    this.physics.world.on('worldbounds', onBounds);
+    if (opts.ttl) this.time.delayedCall(opts.ttl, () => { if (s.active) s.destroy(); });
+    return s;
   }
 
   throwPoop(tx, ty) {
@@ -1069,29 +1070,10 @@ class GameScene extends Phaser.Scene {
     if (now - this.lastThrow < C.POOP_COOLDOWN) return;
     this.lastThrow = now;
     SFX.throw();
-
-    const px   = this.player.x;
-    const py   = this.player.y - 10;
-    const poop = this.poops.create(px, py, 'poop');
-    poop.setScale(2).setDepth(5);
-    poop.body.setAllowGravity(true);
-
-    const targetX = (tx !== undefined) ? tx : this.input.activePointer.x;
-    const targetY = (ty !== undefined) ? ty : this.input.activePointer.y;
-    const dx = targetX - px, dy = targetY - py;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    const vx = (dx/dist) * C.POOP_SPEED;
-    const vy = (dy/dist) * C.POOP_SPEED - 0.5 * C.GRAVITY * (dist/C.POOP_SPEED);
-    poop.setVelocity(vx, vy);
-    poop.setCollideWorldBounds(true);
-    poop.body.onWorldBounds = true;
-    const onBounds = (body) => {
-      if (body.gameObject === poop && poop.active) {
-        this.physics.world.off('worldbounds', onBounds);
-        this.doSplat(poop.x, poop.y); poop.destroy();
-      }
-    };
-    this.physics.world.on('worldbounds', onBounds);
+    const ptr = this.input.activePointer;
+    this.lob(this.poops, 'poop', this.player.x, this.player.y - 10,
+      (tx !== undefined) ? tx : ptr.x, (ty !== undefined) ? ty : ptr.y,
+      C.POOP_SPEED, { splat: true });
   }
 
   doSplat(x, y, big = false) {
@@ -1197,7 +1179,6 @@ class GameScene extends Phaser.Scene {
         enemy.speed      = Phaser.Math.Between(55, 90);
         enemy.enemyType  = 'worker';
         enemy.randomWalk = true;   // walks straight across, no pursuit
-        enemy.dir        = fromLeft ? 1 : -1;  // always walks toward opposite side
         break;
 
       case 'blade':
@@ -1233,7 +1214,6 @@ class GameScene extends Phaser.Scene {
     if (enemy) {
       enemy.setScale(2);
       enemy.setCollideWorldBounds(false);  // we handle bounds manually
-      enemy.setGravityY(0);
       enemy.setDepth(3);
       enemy.stunned   = false;
       enemy.dir       = fromLeft ? 1 : -1;
@@ -1249,7 +1229,6 @@ class GameScene extends Phaser.Scene {
     const x = fromLeft ? -80 : C.WIDTH + 80;
     const fl = this.forklifts.create(x, y, 'forklift');
     fl.setScale(2).setDepth(3);
-    fl.setGravityY(0);
     fl.body.setAllowGravity(false);
     // No platform collision — forklifts race across floor level only
     const spd = Phaser.Math.Between(320, 500);  // fast and dangerous
@@ -1260,53 +1239,13 @@ class GameScene extends Phaser.Scene {
   }
 
   fireGuardShot(guard) {
-    const ox = guard.x, oy = guard.y - 20;
-    const tx = this.player.x, ty = this.player.y;
-    const dart = this.hazards.create(ox, oy, 'dart');
-    dart.setScale(2).setDepth(5);
-    dart.body.setAllowGravity(true);
-    dart.setCollideWorldBounds(true);
-    dart.body.onWorldBounds = true;
-    // Arc toward player, same compensation as chimp poop
-    const dx = tx - ox, dy = ty - oy;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    const spd  = 420;
-    const vx   = (dx / dist) * spd;
-    const vy   = (dy / dist) * spd - 0.5 * C.GRAVITY * (dist / spd);
-    dart.setVelocity(vx, vy);
-    dart.setFlipX(vx < 0);
-    const onDartBounds = (body) => {
-      if (body.gameObject === dart && dart.active) {
-        this.physics.world.off('worldbounds', onDartBounds);
-        dart.destroy();
-      }
-    };
-    this.physics.world.on('worldbounds', onDartBounds);
-    this.time.delayedCall(3000, () => { if (dart.active) dart.destroy(); });
+    this.lob(this.hazards, 'dart', guard.x, guard.y - 20,
+      this.player.x, this.player.y, 420, { flip: true, ttl: 3000 });
   }
 
   throwManagerClipboard(manager) {
-    const cb = this.hazards.create(manager.x, manager.y - 30, 'clipboard');
-    cb.setScale(2).setDepth(5);
-    cb.body.setAllowGravity(true);
-    cb.setCollideWorldBounds(true);
-    cb.body.onWorldBounds = true;
-    const dx  = this.player.x - manager.x;
-    const dy  = this.player.y - manager.y;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    // Arc toward player with gravity compensation, same as chimp poop
-    const spd = 400;
-    const vx2 = (dx/dist) * spd;
-    const vy2 = (dy/dist) * spd - 0.5 * C.GRAVITY * (dist / spd);
-    cb.setVelocity(vx2, vy2);
-    const onCbBounds = (body) => {
-      if (body.gameObject === cb && cb.active) {
-        this.physics.world.off('worldbounds', onCbBounds);
-        cb.destroy();
-      }
-    };
-    this.physics.world.on('worldbounds', onCbBounds);
-    this.time.delayedCall(3000, () => { if (cb.active) cb.destroy(); });
+    this.lob(this.hazards, 'clipboard', manager.x, manager.y - 30,
+      this.player.x, this.player.y, 400, { ttl: 3000 });
   }
 
   // ─────────────────────────────────────────────────────────
@@ -1363,7 +1302,6 @@ class GameScene extends Phaser.Scene {
       if (s >= 5000) pool.push('manager');
     }
 
-    if (pool.length === 0) pool.push('guard');
     const type = pool[Math.floor(Math.random() * pool.length)];
     this.spawnEnemy(type);
   }
@@ -1426,7 +1364,6 @@ class GameScene extends Phaser.Scene {
 
     // No physics zone — detection is done via distance check in updateFan()
     // This avoids Phaser stale-pair bugs with destroyed objects + static zones
-    this.fanZoneActive = false;  // armed in startFanSpin
   }
 
   updateFan() {
@@ -1437,14 +1374,13 @@ class GameScene extends Phaser.Scene {
     }
 
     // Manual poop-hits-fan detection — immune to Phaser stale overlap pairs
-    if (this.fanSpinning && this.fanZoneActive && !this.fanTriggered) {
+    if (this.fanSpinning && !this.fanTriggered) {
       this.poops.getChildren().forEach(poop => {
         if (!poop.active || this.fanTriggered) return;
         const dx = poop.x - this.fanCX;
         const dy = poop.y - this.fanCY;
         if (Math.sqrt(dx*dx + dy*dy) < 130) {
-          this.fanTriggered  = true;
-          this.fanZoneActive = false;
+          this.fanTriggered = true;
           this.nukeAllEnemies();
           this.triggerFanSpread(poop.x, poop.y);
           poop.destroy();
@@ -1479,7 +1415,6 @@ class GameScene extends Phaser.Scene {
     const secsLeft = Math.ceil((this.fanLockoutUntil - this.time.now) / 1000);
     const pct      = Math.min(Math.floor(frac * 100), 100);
     this.fanBar.setScale(Math.max(frac, 0), 1);
-    this.fanBar.setFillStyle(0xFF0000);
     if (this.fanSpinning) {
       this.fanLabel.setText('HEAT STRESS 100%');
       this.fanLabel.setColor('#FF0000');
@@ -1493,10 +1428,9 @@ class GameScene extends Phaser.Scene {
   }
 
   startFanSpin() {
-    this.fanSpinning   = true;
-    this.fanTriggered  = false;
-    this.fanZoneActive = true;  // arm distance detection for this spin cycle
-    this.fanSpeed      = 0;
+    this.fanSpinning  = true;
+    this.fanTriggered = false;
+    this.fanSpeed     = 0;
     SFX.fanRevUp();
     this.tweens.addCounter({
       from: 0, to: 14, duration: 1200,
@@ -1601,7 +1535,7 @@ class GameScene extends Phaser.Scene {
     gfx.strokeCircle(CX, CY, R);
 
     // Arrow hints
-    const hintStyle = { fontSize: '14px', color: '#ffffff', alpha: 0.5 };
+    const hintStyle = { fontSize: '14px', color: '#ffffff' };
     this.add.text(CX - R + 10, CY,      '◀', hintStyle).setOrigin(0.5).setDepth(51).setScrollFactor(0);
     this.add.text(CX + R - 10, CY,      '▶', hintStyle).setOrigin(0.5).setDepth(51).setScrollFactor(0);
     this.add.text(CX,          CY - R + 10, '▲', hintStyle).setOrigin(0.5).setDepth(51).setScrollFactor(0);
@@ -1791,7 +1725,6 @@ class GameScene extends Phaser.Scene {
     this.boss = this.physics.add.sprite(spawnX, bossFloorY, 'boss');
     this.boss.play('boss_walk');
     this.boss.setScale(3).setDepth(4);
-    this.boss.setGravityY(0);
     this.boss.setCollideWorldBounds(false);
     this.boss.bossHP     = 5;
     this.boss.stunned    = false;
@@ -1848,27 +1781,8 @@ class GameScene extends Phaser.Scene {
   }
 
   throwBossKeyboard(boss) {
-    const kb = this.hazards.create(boss.x, boss.y - 30, 'keyboard');
-    kb.setScale(2).setDepth(5);
-    kb.body.setAllowGravity(true);
-    kb.setCollideWorldBounds(true);
-    kb.body.onWorldBounds = true;
-    const dx = this.player.x - boss.x;
-    const dy = this.player.y - boss.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const spd  = 380;
-    const vx   = (dx / dist) * spd;
-    const vy   = (dy / dist) * spd - 0.5 * C.GRAVITY * (dist / spd);
-    kb.setVelocity(vx, vy);
-    kb.setFlipX(vx < 0);
-    const onKbBounds = (body) => {
-      if (body.gameObject === kb && kb.active) {
-        this.physics.world.off('worldbounds', onKbBounds);
-        kb.destroy();
-      }
-    };
-    this.physics.world.on('worldbounds', onKbBounds);
-    this.time.delayedCall(3000, () => { if (kb.active) kb.destroy(); });
+    this.lob(this.hazards, 'keyboard', boss.x, boss.y - 30,
+      this.player.x, this.player.y, 380, { flip: true, ttl: 3000 });
   }
 
   updateBoss(time) {
@@ -1948,19 +1862,6 @@ class GameScene extends Phaser.Scene {
     this.add.image(x, floorTop-14,   'pallet').setOrigin(0.5,1).setDisplaySize(80,14);
     this.pallets.create(x, floorTop-24, null).setDisplaySize(80,8).refreshBody().setAlpha(0);
   }
-
-  addShelfSpanning(x, y, width) {
-    this.add.image(x, y, 'shelf').setOrigin(0.5,0).setDisplaySize(width,16);
-    this.platforms.create(x, y+8, null).setDisplaySize(width,8).refreshBody().setAlpha(0);
-  }
-}
-
-// ============================================================
-//  UI SCENE (stub)
-// ============================================================
-class UIScene extends Phaser.Scene {
-  constructor() { super('UI'); }
-  create() {}
 }
 
 // ============================================================
@@ -1978,10 +1879,7 @@ class GameOverScene extends Phaser.Scene {
       stroke: '#000', strokeThickness: 6
     }).setOrigin(0.5);
 
-    const initials = data.initials ? data.initials.trim() : '';
-    const scoreLine = initials
-      ? initials + '  \u2014  ' + (data.score || 0)
-      : 'SCORE: ' + (data.score || 0);
+    const scoreLine = data.initials.trim() + '  \u2014  ' + (data.score || 0);
     this.add.text(W/2, H/2 - 25, scoreLine, {
       fontFamily: 'industry, Arial Black, sans-serif', fontSize: '32px', color: '#FFC425',
       stroke: '#000', strokeThickness: 4
@@ -2344,7 +2242,7 @@ const config = {
     default: 'arcade',
     arcade: { gravity: { y: C.GRAVITY }, debug: false }
   },
-  scene: [BootScene, TitleScene, GameScene, UIScene, GameOverScene, EnterInitialsScene, PauseScene],
+  scene: [BootScene, TitleScene, GameScene, GameOverScene, EnterInitialsScene, PauseScene],
   parent: document.body,
   scale: {
     mode: Phaser.Scale.EXPAND,
