@@ -11,7 +11,7 @@ SERVER=$!
 trap 'kill "$SERVER" 2>/dev/null' EXIT
 for _ in $(seq 20); do curl -s -o /dev/null "http://127.0.0.1:$PORT/index.html" && break; sleep 0.25; done
 
-for t in boss scale floor; do
+for t in boss scale floor gameover; do
   node "$t.test.mjs"
 done
 echo "ALL PASS"
