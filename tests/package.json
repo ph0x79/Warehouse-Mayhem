@@ -1,0 +1,12 @@
+{
+  "name": "warehouse-mayhem-tests",
+  "private": true,
+  "type": "module",
+  "description": "Headless browser checks. Kept out of the root package.json so the Netlify build never installs Playwright.",
+  "scripts": {
+    "test": "bash run.sh"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}
