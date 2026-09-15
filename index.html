@@ -1043,12 +1043,13 @@ class GameScene extends Phaser.Scene {
     s.body.onWorldBounds = true;
     const onBounds = (body) => {
       if (body.gameObject === s && s.active) {
-        this.physics.world.off('worldbounds', onBounds);
         if (opts.splat) this.doSplat(s.x, s.y);
         s.destroy();
       }
     };
     this.physics.world.on('worldbounds', onBounds);
+    // However the sprite dies (bounds, hit, ttl, nuke, scene shutdown), drop its listener. world is null mid-shutdown.
+    s.once('destroy', () => this.physics.world?.off('worldbounds', onBounds));
     if (opts.ttl) this.time.delayedCall(opts.ttl, () => { if (s.active) s.destroy(); });
     return s;
   }
