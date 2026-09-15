@@ -714,9 +714,8 @@ class BootScene extends Phaser.Scene {
       g.destroy();
     }
 
-    // ── FAN BLADE — Powerfoil X4 airfoil shape (76x18)
+    // ── FAN BLADE — Powerfoil X4 airfoil shape, native 76x9, displayed at uniform 2x (152x18)
     // Structure: [arm 10px][airfoil body 54px][yellow tip 12px]
-    // Airfoil profile: wider/thicker at root, tapers & sweeps at trailing edge
     {
       const g = this.make.graphics({ add: false });
       const ARM  = 0x3A3A46;  // mounting arm — darker than blade
@@ -728,37 +727,27 @@ class BootScene extends Phaser.Scene {
       const TIP_D = 0xCC9000;
 
       // ── Mounting arm (root stub from hub to blade) — narrow rod
-      px(g, ARM,  0,  7,  10,  4);   // arm body center
-      px(g, 0x4E4E60, 0, 7, 10, 1);  // arm top highlight
-      px(g, 0x222228, 0, 10, 10, 1); // arm bottom shadow
+      px(g, ARM,  0, 3, 10, 3);      // arm body center
+      px(g, 0x4E4E60, 0, 3, 10, 1);  // arm top highlight
+      px(g, 0x222228, 0, 5, 10, 1);  // arm bottom shadow
 
-      // ── Airfoil body — camber: top surface starts row 4, bottom row 14
-      // Leading edge (left of airfoil): full height
-      px(g, BL,   10,  4, 54, 10);   // main airfoil slab
-      // Upper cambered surface — highlight row
-      px(g, BL_L, 10,  4, 54,  2);
-      // Lower surface shadow
-      px(g, BL_D, 10, 12, 54,  2);
-      // Trailing edge sweep: bottom surface steps up 1px every ~12px
-      // (simulates swept-back planform of Powerfoil X4)
-      px(g, BL_D, 10, 13, 20,  1);   // row 13 only near root
-      // Thicker root section (first 16px of airfoil, rows 3–14)
-      px(g, BL,   10,  3, 16,  1);   // extra row at top near root
-      px(g, BL,   10, 14, 16,  1);   // extra row at bottom near root
-      px(g, BL_L, 10,  3,  8,  1);   // root top highlight
+      // ── Airfoil body
+      px(g, BL,   10, 2, 54, 5);     // main airfoil slab
+      px(g, BL_L, 10, 2, 54, 1);     // upper surface highlight
+      px(g, BL_D, 10, 6, 54, 1);     // lower surface shadow
+      // Thicker root section (first 16px of airfoil)
+      px(g, BL,   10, 1, 16, 1);
+      px(g, BL,   10, 7, 16, 1);
 
       // ── Yellow tip (last 12px)
-      px(g, TIP,  64,  4, 12, 10);
-      px(g, TIP_L,64,  4, 12,  2);   // tip highlight
-      px(g, TIP_D,64, 12, 12,  2);   // tip shadow
-      // Rounded tip — clip corners pixel-art style
-      px(g, TIP,  64,  4,  2,  1);   // shave top-left corner of tip
+      px(g, TIP,  64, 2, 12, 5);
+      px(g, TIP_L,64, 2, 12, 1);     // tip highlight
+      px(g, TIP_D,64, 6, 12, 1);     // tip shadow
 
       // Attachment bolt on arm
-      px(g, 0x5A5A6E, 4, 7, 3, 4);
-      px(g, BL_L,     5, 8, 1, 2);
+      px(g, 0x5A5A6E, 4, 3, 3, 2);
 
-      g.generateTexture('fan_blade', 76, 18);
+      g.generateTexture('fan_blade', 76, 9);
       g.destroy();
     }
 
@@ -801,18 +790,18 @@ class BootScene extends Phaser.Scene {
       g.destroy();
     }
 
-    // ── BOX (stackable crate)
+    // ── BOX (stackable crate) — native 18x18, displayed at 2x (36x36) to match the shelf art
     {
-      const S = 40;
+      const S = 18;
       const g = this.make.graphics({ add: false });
       px(g, C.COL.BOX_TAN,   0,  0, S,   S);
-      px(g, C.COL.BOX_SHADE, 0,  0, S,   4);  // top shade
-      px(g, C.COL.BOX_DARK,  0, S-4, S,  4);  // bottom shadow
-      px(g, C.COL.BOX_DARK,  S-4, 0, 4,  S);  // right shadow
+      px(g, C.COL.BOX_SHADE, 0,  0, S,   2);  // top shade
+      px(g, C.COL.BOX_DARK,  0, S-2, S,  2);  // bottom shadow
+      px(g, C.COL.BOX_DARK,  S-2, 0, 2,  S);  // right shadow
       // X cross on box face
-      for (let i = 4; i < S - 4; i++) {
-        px(g, C.COL.BOX_DARK, i, i, 2, 2);
-        px(g, C.COL.BOX_DARK, S - 1 - i, i, 2, 2);
+      for (let i = 2; i < S - 2; i++) {
+        px(g, C.COL.BOX_DARK, i, i, 1, 1);
+        px(g, C.COL.BOX_DARK, S - 1 - i, i, 1, 1);
       }
       g.generateTexture('box', S, S);
       g.destroy();
@@ -1344,7 +1333,7 @@ class GameScene extends Phaser.Scene {
     for (let i = 0; i < NUM_BLADES; i++) {
       const blade = this.add.image(cx, cy, 'fan_blade')
         .setOrigin(0, 0.5)
-        .setScale(2, 1)
+        .setScale(2)
         .setDepth(3);
       blade.angle = (i / NUM_BLADES) * 360;  // set after creation so origin pivot is applied
       this.fanBladeImages.push(blade);
@@ -1848,14 +1837,16 @@ class GameScene extends Phaser.Scene {
 
   addShelfUnit(x, shelfYs) {
     const bot = C.HEIGHT - 64, top = Math.min(...shelfYs);
+    // TileSprite instead of a stretched image: the bolt-hole pattern repeats at its native
+    // pixel size instead of warping to whatever gap this shelf unit happens to need.
     for (const ux of [x-90, x+90])
-      this.add.image(ux, bot, 'shelf_upright').setOrigin(0.5,1).setDisplaySize(12, bot-top+20);
+      this.add.tileSprite(ux, bot, 12, bot-top+20, 'shelf_upright').setOrigin(0.5,1);
     shelfYs.forEach((y, idx) => {
       this.add.image(x, y, 'shelf').setOrigin(0.5, 0).setDisplaySize(200, 16);
       this.platforms.create(x, y+8, null).setDisplaySize(196, 8).refreshBody().setAlpha(0);
       const n = (idx%2===0) ? 3 : 2;
       for (let b=0; b<n; b++)
-        this.add.image(x-60+b*44, y, 'box').setOrigin(0.5,1).setDisplaySize(36,36);
+        this.add.image(x-60+b*44, y, 'box').setOrigin(0.5,1).setScale(2);
     });
   }
 
@@ -2240,6 +2231,7 @@ const config = {
   input: { activePointers: 3 },
   backgroundColor: '#000000',
   pixelArt: true,        // disables anti-aliasing globally
+  roundPixels: true,     // snaps sprite positions to integer pixels so they don't shimmer while moving
   physics: {
     default: 'arcade',
     arcade: { gravity: { y: C.GRAVITY }, debug: false }
