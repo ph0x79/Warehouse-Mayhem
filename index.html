@@ -1475,6 +1475,12 @@ class GameScene extends Phaser.Scene {
       this.doSplat(fl.x, fl.y);
       fl.destroy();
     });
+    // Darts, clipboards and boss keyboards in the air. The boss himself is not in a group, so he stays.
+    this.hazards.getChildren().slice().forEach(h => {
+      if (!h.active) return;
+      this.doSplat(h.x, h.y);
+      h.destroy();
+    });
   }
 
   // ─────────────────────────────────────────────────────────
@@ -1867,18 +1873,49 @@ class GameOverScene extends Phaser.Scene {
     const W = C.WIDTH, H = C.HEIGHT;
     this.add.rectangle(W/2, H/2, W, H, 0x000000, 0.85);
 
-    this.add.text(W/2, H/2 - 100, 'GAME OVER', {
+    this.add.text(W/2, 55, 'GAME OVER', {
       fontFamily: 'industry, Arial Black, sans-serif', fontSize: '52px', color: '#FF4444',
       stroke: '#000', strokeThickness: 6
     }).setOrigin(0.5);
 
-    const scoreLine = data.initials.trim() + '  \u2014  ' + (data.score || 0);
-    this.add.text(W/2, H/2 - 25, scoreLine, {
+    const initials = data.initials.trim().toUpperCase();
+    const score = data.score || 0;
+    this.add.text(W/2, 120, initials + '  \u2014  ' + score, {
       fontFamily: 'industry, Arial Black, sans-serif', fontSize: '32px', color: '#FFC425',
       stroke: '#000', strokeThickness: 4
     }).setOrigin(0.5);
 
-    const prompt = this.add.text(W/2, H/2 + 70, 'PRESS ENTER TO RETURN TO TITLE', {
+    this.add.text(W/2, 175, 'HIGH SCORES', {
+      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '22px', color: '#FFFFFF',
+      stroke: '#000', strokeThickness: 4
+    }).setOrigin(0.5);
+    const boardMsg = this.add.text(W/2, 300, 'LOADING...', {
+      fontFamily: 'industry, Arial Black, sans-serif', fontSize: '14px', color: '#888888'
+    }).setOrigin(0.5);
+
+    fetchTopScores().then(scores => {
+      if (!this.scene.isActive('GameOver')) return;
+      // get-scores is cached for 30s, so the score just submitted can be missing: add it locally if it qualifies.
+      let mine = scores.findIndex(s => s.initials === initials && s.score === score);
+      if (mine < 0 && (scores.length < 10 || score > scores[scores.length - 1].score)) {
+        mine = scores.findIndex(s => s.score < score);
+        if (mine < 0) mine = scores.length;
+        scores.splice(mine, 0, { initials, score });
+        scores.length = Math.min(scores.length, 10);
+      }
+      if (scores.length === 0) { boardMsg.setText('NO SCORES YET'); return; }
+      boardMsg.destroy();
+      scores.forEach((entry, idx) => {
+        const rank = String(idx + 1).padStart(2, ' ');
+        const row = `${rank}.  ${(entry.initials || '???').padEnd(3, ' ')}  ${String(entry.score || 0).padStart(7, ' ')}`;
+        this.add.text(W/2, 212 + idx * 32, row, {
+          fontFamily: 'proxima-nova, Arial, sans-serif', fontSize: '18px',
+          color: idx === mine ? '#FFC425' : '#FFFFFF', stroke: '#000', strokeThickness: 2
+        }).setOrigin(0.5);
+      });
+    });
+
+    const prompt = this.add.text(W/2, 590, 'PRESS ENTER TO RETURN TO TITLE', {
       fontFamily: 'industry, Arial Black, sans-serif', fontSize: '18px', color: '#FFFFFF',
       stroke: '#000', strokeThickness: 3
     }).setOrigin(0.5);

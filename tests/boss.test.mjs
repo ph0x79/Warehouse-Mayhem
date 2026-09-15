@@ -25,10 +25,24 @@ try {
   let s = await snap();
   assert.deepEqual([s.alive, s.hp], [true, 3], 'boss spawns with 3 HP');
 
+  // Two enemy projectiles hanging in the air, well away from the player, for the nuke to clear.
+  const hazardsBefore = await page.evaluate(() => {
+    const g = window.__game.scene.getScene('Game');
+    for (const [x, tex] of [[150, 'dart'], [810, 'keyboard']]) {
+      const h = g.hazards.create(x, 120, tex);
+      h.body.setAllowGravity(false);
+      h.setVelocity(0, 0);
+    }
+    return g.hazards.countActive();
+  });
+  assert.equal(hazardsBefore, 2, 'two hazards in the air before the nuke');
+
   await dropPoop(true);
   await page.waitForTimeout(300);
   s = await snap();
   assert.ok(s.fanTriggered, 'fan nuke fired');
+  assert.equal(await page.evaluate(() => window.__game.scene.getScene('Game').hazards.countActive()), 0,
+    'fan nuke destroys enemy projectiles');
   assert.deepEqual([s.alive, s.hp], [true, 3], 'boss is immune to the fan nuke');
 
   const scoreBefore = s.score;
