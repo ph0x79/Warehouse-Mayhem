@@ -1726,7 +1726,7 @@ class GameScene extends Phaser.Scene {
     this.boss.play('boss_walk');
     this.boss.setScale(3).setDepth(4);
     this.boss.setCollideWorldBounds(false);
-    this.boss.bossHP     = 5;
+    this.boss.bossHP     = 3;
     this.boss.stunned    = false;
     this.boss.dir        = fromLeft ? 1 : -1;
     this.boss.speed      = 60;
@@ -1735,7 +1735,9 @@ class GameScene extends Phaser.Scene {
     this.boss.setFlipX(this.boss.dir < 0);
     this.physics.add.collider(this.boss, this.platforms);
 
-    this.physics.add.overlap(this.poops, this.boss, (poop, boss) => {
+    // Sprite first: Phaser passes (sprite, groupChild) whichever order the args
+    // are given, so (poops, boss) handed the boss in as `poop` and destroyed it.
+    this.physics.add.overlap(this.boss, this.poops, (boss, poop) => {
       if (!poop.active || !boss.active || boss.stunned) return;
       this.doSplat(poop.x, poop.y);
       poop.destroy();
