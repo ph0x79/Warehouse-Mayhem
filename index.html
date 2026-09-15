@@ -63,23 +63,40 @@ const C = {
   SPAWN_RATE_BASE: 3000,   // ms between enemy spawns (decreases over time)
   FAN_THRESHOLD:   1000,   // score points to charge the fan
 
-  // NES-ish palette
-  COL: {
-    CONCRETE:    0x7C7C7C,
-    CONCRETE_D:  0x585858,
-    CONCRETE_L:  0xBCBCBC,
-    SHELF_METAL: 0x888898,
-    SHELF_DARK:  0x444454,
-    SHELF_LIGHT: 0xAABBCC,
-    BOX_TAN:     0xD8A048,
-    BOX_DARK:    0x885820,
-    BOX_SHADE:   0xA86828,
-    HAZARD_YEL:  0xFFC425,
-    PALLET:      0xB87840,
-    PALLET_D:    0x805030,
-    SKY_CEIL:    0x283050,   // ceiling/upper bg
-    WALL:        0x5C6070,
-    WALL_D:      0x404550,
+  // One shared palette for every texture, each ramp dark to light. INK doubles as the outline colour.
+  PAL: {
+    INK:      0x111118,
+    GREY_1:   0x2A2A34,
+    GREY_2:   0x444454,
+    GREY_3:   0x5C5C70,
+    GREY_4:   0x888898,
+    GREY_5:   0xAABBCC,
+    GREY_6:   0xCCCCDD,
+    WHITE:    0xFCFCFC,
+    NAVY:     0x283050,   // ceiling
+    BLUE_D:   0x1A3090,
+    BLUE:     0x3050C0,
+    SKY:      0x99CCFF,
+    SKY_L:    0xCCEEFF,
+    YEL_DD:   0x8A6C00,
+    YEL_D:    0xCC9000,
+    YEL:      0xFFC425,   // hazard / Big Ass Fans yellow
+    YEL_L:    0xFFE066,
+    CREAM:    0xFFFACC,
+    ORANGE_D: 0xCC4400,
+    ORANGE:   0xFF6600,
+    ORANGE_L: 0xFFAA00,
+    RED:      0xCC0000,
+    RED_L:    0xFF4444,
+    BROWN_0:  0x3A1C08,
+    BROWN_1:  0x5C3010,
+    BROWN_2:  0x7B4018,
+    BROWN_3:  0xA86828,
+    TAN_D:    0xC07840,
+    TAN:      0xD8A048,
+    KHAKI:    0xC8A96E,
+    SKIN_D:   0xCC9966,
+    SKIN:     0xFFCCA0,
   }
 };
 
@@ -111,6 +128,7 @@ async function fetchTopScores() {
 
 // Draw a pixel rect on a graphics object.
 const px = (g, col, x, y, w, h) => { g.fillStyle(col, 1); g.fillRect(x, y, w, h); };
+const P = C.PAL;
 
 class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
@@ -134,26 +152,26 @@ class BootScene extends Phaser.Scene {
     const W = C.WIDTH, H = C.HEIGHT;
 
     // Ceiling band
-    px(g, C.COL.SKY_CEIL,    0,  0, W,  60);
+    px(g, P.NAVY,    0,  0, W,  60);
     // Ceiling edge trim
-    px(g, C.COL.CONCRETE_D,  0, 58, W,   4);
+    px(g, P.GREY_3,  0, 58, W,   4);
 
     // Back wall
-    px(g, C.COL.WALL, 0, 60, W, H - 60);
+    px(g, P.GREY_3, 0, 60, W, H - 60);
 
     // Subtle wall panel lines (vertical)
     for (let x = 0; x < W; x += 80) {
-      px(g, C.COL.WALL_D, x, 60, 2, H - 120);
+      px(g, P.GREY_2, x, 60, 2, H - 120);
     }
     // Horizontal panel lines
     for (let y = 60; y < H - 80; y += 90) {
-      px(g, C.COL.WALL_D, 0, y, W, 2);
+      px(g, P.GREY_2, 0, y, W, 2);
     }
 
     // Floor
-    px(g, C.COL.CONCRETE,   0, H - 64, W, 64);
-    px(g, C.COL.CONCRETE_L, 0, H - 64, W,  4); // floor highlight
-    px(g, C.COL.CONCRETE_D, 0, H - 4,  W,  4); // floor shadow
+    px(g, P.GREY_4,   0, H - 64, W, 64);
+    px(g, P.GREY_5, 0, H - 64, W,  4); // floor highlight
+    px(g, P.GREY_3, 0, H - 4,  W,  4); // floor shadow
 
     // Hazard stripes on floor
     const stripeW = 28;
@@ -161,13 +179,13 @@ class BootScene extends Phaser.Scene {
       // Draw angled stripe as a series of horizontal slices
       for (let row = 0; row < 64; row++) {
         const offset = Math.floor(row * 0.8);
-        px(g, C.COL.HAZARD_YEL, x + offset, H - 64 + row, stripeW, 1);
+        px(g, P.YEL, x + offset, H - 64 + row, stripeW, 1);
       }
     }
     // Overlay floor base color semi-opaque — use separate rects for grid look
     // Floor grid lines
     for (let x = 0; x < W; x += 64) {
-      px(g, C.COL.CONCRETE_D, x, H - 64, 1, 64);
+      px(g, P.GREY_3, x, H - 64, 1, 64);
     }
 
     g.generateTexture('background', W, H);
@@ -182,22 +200,22 @@ class BootScene extends Phaser.Scene {
     const g = this.make.graphics({ add: false });
     const px = (col, x, y, w, h) => { g.fillStyle(col, 1); g.fillRect(x, y, w, h); };
 
-    const BROWN      = 0x7B3F00;
-    const BROWN_D    = 0x4A2500;
-    const BROWN_L    = 0xC07840;
-    const FACE       = 0xE8B080;
-    const FACE_D     = 0xC89060;
-    const VEST_YEL   = 0xFFC425;
-    const VEST_SHADE = 0xCC9000;
-    const VEST_DARK  = 0x8A6C00;
-    const HAT_YEL    = 0xFFC425;
-    const HAT_SHADE  = 0xCC9900;
-    const HAT_DARK   = 0x997700;
-    const HAT_BRIM   = 0xFFE44A;
-    const EYE        = 0x110800;
-    const WHITE      = 0xFCFCFC;
-    const REFL       = 0xFFFACC;
-    const EAR_IN     = 0xD4906A;
+    const BROWN      = P.BROWN_2;
+    const BROWN_D    = P.BROWN_0;
+    const BROWN_L    = P.TAN_D;
+    const FACE       = P.SKIN;
+    const FACE_D     = P.SKIN_D;
+    const VEST_YEL   = P.YEL;
+    const VEST_SHADE = P.YEL_D;
+    const VEST_DARK  = P.YEL_DD;
+    const HAT_YEL    = P.YEL;
+    const HAT_SHADE  = P.YEL_D;
+    const HAT_DARK   = P.YEL_DD;
+    const HAT_BRIM   = P.YEL_L;
+    const EYE        = P.INK;
+    const WHITE      = P.WHITE;
+    const REFL       = P.CREAM;
+    const EAR_IN     = P.SKIN_D;
 
     // Draw one full chimp frame at pixel offset (ox, oy)
     // legOff: leg animation offset (+/-3 or 0)
@@ -332,10 +350,9 @@ class BootScene extends Phaser.Scene {
   }
 
   makePoopTextures() {
-    const POOP_BR  = 0x5C3010;
-    const POOP_L   = 0x7A4820;
-    const POOP_D   = 0x3A1C08;
-    const SPLAT_YL = 0x8B5A00;
+    const POOP_BR  = P.BROWN_1;
+    const POOP_L   = P.BROWN_2;
+    const POOP_D   = P.BROWN_0;
 
     // ── Flying poop projectile (10x10)
     {
@@ -376,8 +393,8 @@ class BootScene extends Phaser.Scene {
     // ── Reticle (20x20) — crosshair cursor
     {
       const g = this.make.graphics({ add: false });
-      const RC = 0xFF4444;
-      const RD = 0xAA0000;
+      const RC = P.RED_L;
+      const RD = P.RED;
       // Outer ring
       px(g, RC, 6,  0, 8, 2);
       px(g, RC, 6, 18, 8, 2);
@@ -398,12 +415,11 @@ class BootScene extends Phaser.Scene {
   makeEnemyTextures() {
 
     // Shared human body colors
-    const SKIN   = 0xFFCCA0;
-    const SKIN_D = 0xCC9966;
-    const HAIR   = 0x442200;
-    const EYE    = 0x111111;
-    const WHITE  = 0xFCFCFC;
-    const BOOT   = 0x222222;
+    const SKIN   = P.SKIN;
+    const SKIN_D = P.SKIN_D;
+    const EYE    = P.INK;
+    const WHITE  = P.WHITE;
+    const BOOT   = P.GREY_1;
 
     // Helper: draw a generic worker head at (ox, oy) on graphics g
     const head = (g, ox, oy, hatCol, hatDk) => {
@@ -436,14 +452,14 @@ class BootScene extends Phaser.Scene {
 
     // ── WAREHOUSE WORKER (blue shirt, tan pants) — 2 walk frames
     {
-      const SHIRT = 0x3050C0; const SHIRT_D = 0x1A3090;
-      const PANTS = 0x708090; const PANTS_D = 0x4A5A6A;
+      const SHIRT = P.BLUE; const SHIRT_D = P.BLUE_D;
+      const PANTS = P.GREY_4;
       const g = this.make.graphics({ add: false });
       // frame 0
-      head(g,  0, 0, 0x888888, 0x555555);
+      head(g,  0, 0, P.GREY_4, P.GREY_3);
       body(g,  0, 0, SHIRT, SHIRT_D, PANTS,  3);
       // frame 1
-      head(g, 16, 0, 0x888888, 0x555555);
+      head(g, 16, 0, P.GREY_4, P.GREY_3);
       body(g, 16, 0, SHIRT, SHIRT_D, PANTS, -3);
       g.generateTexture('worker', 32, 34);
       g.destroy();
@@ -456,18 +472,18 @@ class BootScene extends Phaser.Scene {
 
     // ── WORKER WITH FAN BLADE (orange vest, carrying long blade)
     {
-      const VEST = 0xFF6600; const VEST_D = 0xCC4400;
-      const BLADE = 0xCCCCDD; const BLADE_D = 0x888899;
+      const VEST = P.ORANGE; const VEST_D = P.ORANGE_D;
+      const BLADE = P.GREY_6; const BLADE_D = P.GREY_4;
       const g = this.make.graphics({ add: false });
       // frame 0
-      head(g,  0, 0, 0xFFAA00, 0xCC7700);
-      body(g,  0, 0, VEST, VEST_D, 0x445566, 2);
+      head(g,  0, 0, P.ORANGE_L, P.ORANGE_D);
+      body(g,  0, 0, VEST, VEST_D, P.GREY_2, 2);
       // fan blade — long horizontal bar carried at waist height
       px(g, BLADE,  -8, 16, 40, 5);
       px(g, BLADE_D,-8, 20, 40, 2);
       // frame 1
-      head(g, 24, 0, 0xFFAA00, 0xCC7700);
-      body(g, 24, 0, VEST, VEST_D, 0x445566, -2);
+      head(g, 24, 0, P.ORANGE_L, P.ORANGE_D);
+      body(g, 24, 0, VEST, VEST_D, P.GREY_2, -2);
       px(g, BLADE,  16, 16, 40, 5);
       px(g, BLADE_D,16, 20, 40, 2);
       g.generateTexture('worker_blade', 48, 34);
@@ -481,23 +497,23 @@ class BootScene extends Phaser.Scene {
 
     // ── SECURITY GUARD (black uniform, cap)
     {
-      const SHIRT = 0x222233; const SHIRT_D = 0x111122;
-      const PANTS = 0x222233;
+      const SHIRT = P.GREY_1; const SHIRT_D = P.INK;
+      const PANTS = P.GREY_1;
       const g = this.make.graphics({ add: false });
       // frame 0
-      head(g,  0, 0, 0x111122, 0x000011);
+      head(g,  0, 0, P.INK, P.INK);
       body(g,  0, 0, SHIRT, SHIRT_D, PANTS,  3);
       // badge
-      px(g, 0xFFC425, 5, 16, 3, 3);
+      px(g, P.YEL, 5, 16, 3, 3);
       // gun arm (right arm extended)
       px(g, SKIN,    13, 14,  2, 5);
-      px(g, 0x333333,14, 18,  3, 2); // gun
+      px(g, P.GREY_2,14, 18,  3, 2); // gun
       // frame 1
-      head(g, 16, 0, 0x111122, 0x000011);
+      head(g, 16, 0, P.INK, P.INK);
       body(g, 16, 0, SHIRT, SHIRT_D, PANTS, -3);
-      px(g, 0xFFC425,21, 16, 3, 3);
+      px(g, P.YEL,21, 16, 3, 3);
       px(g, SKIN,    29, 14,  2, 5);
-      px(g, 0x333333,30, 18,  3, 2);
+      px(g, P.GREY_2,30, 18,  3, 2);
       g.generateTexture('guard', 32, 34);
       g.destroy();
       this.textures.get('guard').add(0, 0,  0, 0, 16, 34);
@@ -509,26 +525,26 @@ class BootScene extends Phaser.Scene {
 
     // ── MANAGER (white shirt, tie, clipboard)
     {
-      const SHIRT = 0xEEEEDD; const SHIRT_D = 0xCCCCBB;
-      const TIE   = 0xCC0000;
+      const SHIRT = P.WHITE; const SHIRT_D = P.GREY_6;
+      const TIE   = P.RED;
       const g = this.make.graphics({ add: false });
       // frame 0
-      head(g,  0, 0, 0x222222, 0x111111);
-      body(g,  0, 0, SHIRT, SHIRT_D, 0x333344,  2);
+      head(g,  0, 0, P.GREY_1, P.INK);
+      body(g,  0, 0, SHIRT, SHIRT_D, P.GREY_2,  2);
       px(g, TIE, 7, 14, 2, 8);  // tie
       // clipboard in right hand
-      px(g, 0xD8A048, 13, 14, 5, 7);
+      px(g, P.TAN, 13, 14, 5, 7);
       px(g, WHITE,    14, 15, 3, 5);
-      px(g, 0x555555, 14, 16, 3, 1);
-      px(g, 0x555555, 14, 18, 3, 1);
+      px(g, P.GREY_3, 14, 16, 3, 1);
+      px(g, P.GREY_3, 14, 18, 3, 1);
       // frame 1 (mid-stride)
-      head(g, 16, 0, 0x222222, 0x111111);
-      body(g, 16, 0, SHIRT, SHIRT_D, 0x333344, -2);
+      head(g, 16, 0, P.GREY_1, P.INK);
+      body(g, 16, 0, SHIRT, SHIRT_D, P.GREY_2, -2);
       px(g, TIE, 23, 14, 2, 8);
-      px(g, 0xD8A048, 29, 14, 5, 7);
+      px(g, P.TAN, 29, 14, 5, 7);
       px(g, WHITE,    30, 15, 3, 5);
-      px(g, 0x555555, 30, 16, 3, 1);
-      px(g, 0x555555, 30, 18, 3, 1);
+      px(g, P.GREY_3, 30, 16, 3, 1);
+      px(g, P.GREY_3, 30, 18, 3, 1);
       g.generateTexture('manager', 32, 34);
       g.destroy();
       this.textures.get('manager').add(0, 0,  0, 0, 16, 34);
@@ -541,9 +557,9 @@ class BootScene extends Phaser.Scene {
     // ── FORKLIFT — tall side profile (32x48), mast extends high enough to threaten shelves
     {
       const g = this.make.graphics({ add: false });
-      const YL  = 0xFFC425; const YD = 0xCC9000; const YS = 0xFFE088;
-      const GRY = 0x888898; const GD  = 0x555566; const BLK = 0x1A1A2A;
-      const WIN = 0x99CCFF;
+      const YL  = P.YEL; const YD = P.YEL_D; const YS = P.YEL_L;
+      const GRY = P.GREY_4; const GD  = P.GREY_3; const BLK = P.INK;
+      const WIN = P.SKY;
 
       // ── MAST (vertical rails, left side) — runs full height
       px(g, GD,   0,  0,  3, 48);
@@ -567,7 +583,7 @@ class BootScene extends Phaser.Scene {
 
       // Windshield
       px(g, WIN,  10, 12, 12,  6);
-      px(g, 0xCCEEFF, 10, 12, 4, 2);
+      px(g, P.SKY_L, 10, 12, 4, 2);
 
       // Roll cage
       px(g, GD,   8, 10,  2, 10);
@@ -592,9 +608,9 @@ class BootScene extends Phaser.Scene {
     // ── DART (tranquilizer) — tiny needle
     {
       const g = this.make.graphics({ add: false });
-      px(g, 0xFFFFAA,  0, 2, 10, 2);  // shaft
-      px(g, 0xFF4444, 10, 1,  3, 4);  // tip
-      px(g, 0x88AAFF,  0, 2,  3, 2);  // flight
+      px(g, P.CREAM,  0, 2, 10, 2);  // shaft
+      px(g, P.RED_L, 10, 1,  3, 4);  // tip
+      px(g, P.SKY,    0, 2,  3, 2);  // flight
       g.generateTexture('dart', 14, 6);
       g.destroy();
     }
@@ -602,21 +618,21 @@ class BootScene extends Phaser.Scene {
     // ── CLIPBOARD — thrown by manager
     {
       const g = this.make.graphics({ add: false });
-      px(g, 0xD8A048,  0,  0, 10, 13);
+      px(g, P.TAN,  0,  0, 10, 13);
       px(g, WHITE,     1,  2,  8,  9);
-      px(g, 0x555555,  2,  3,  6,  1);
-      px(g, 0x555555,  2,  5,  6,  1);
-      px(g, 0x555555,  2,  7,  6,  1);
-      px(g, 0xAAAAAA,  3,  0,  4,  2);  // clip
+      px(g, P.GREY_3,  2,  3,  6,  1);
+      px(g, P.GREY_3,  2,  5,  6,  1);
+      px(g, P.GREY_3,  2,  7,  6,  1);
+      px(g, P.GREY_5,  3,  0,  4,  2);  // clip
       g.generateTexture('clipboard', 10, 13);
       g.destroy();
     }
 
     // ── BOSS (bald, brown beard, black polo, khaki pants, boots)
     {
-      const KHAKI = 0xC8A96E; const KHAKI_D = 0xA08050;
-      const POLO  = 0x111111; const POLO_D  = 0x000000;
-      const BEARD = 0x6B3A1F;
+      const KHAKI = P.KHAKI;
+      const POLO  = P.INK; const POLO_D  = P.INK;
+      const BEARD = P.BROWN_2;
       const g = this.make.graphics({ add: false });
       // frame 0 — bald head (full skin top, no hat), brown beard
       px(g, SKIN,   3,  0, 10, 13);
@@ -664,15 +680,15 @@ class BootScene extends Phaser.Scene {
     // ── KEYBOARD — thrown by boss
     {
       const g = this.make.graphics({ add: false });
-      px(g, 0x555566,  0, 0, 14, 7);
-      px(g, 0x333344,  0, 6, 14, 1);
-      px(g, 0x8888AA,  1, 1,  2, 2);
-      px(g, 0x8888AA,  4, 1,  2, 2);
-      px(g, 0x8888AA,  7, 1,  2, 2);
-      px(g, 0x8888AA, 10, 1,  2, 2);
-      px(g, 0x8888AA,  2, 4,  2, 2);
-      px(g, 0x8888AA,  6, 4,  3, 2);
-      px(g, 0x8888AA, 10, 4,  2, 2);
+      px(g, P.GREY_3,  0, 0, 14, 7);
+      px(g, P.GREY_2,  0, 6, 14, 1);
+      px(g, P.GREY_4,  1, 1,  2, 2);
+      px(g, P.GREY_4,  4, 1,  2, 2);
+      px(g, P.GREY_4,  7, 1,  2, 2);
+      px(g, P.GREY_4, 10, 1,  2, 2);
+      px(g, P.GREY_4,  2, 4,  2, 2);
+      px(g, P.GREY_4,  6, 4,  3, 2);
+      px(g, P.GREY_4, 10, 4,  2, 2);
       g.generateTexture('keyboard', 14, 7);
       g.destroy();
     }
@@ -686,10 +702,10 @@ class BootScene extends Phaser.Scene {
     // ── FAN HUB — larger, industrial motor housing (28x28) matching Powerfoil X4 scale
     {
       const g = this.make.graphics({ add: false });
-      const HUB  = 0x4A4A58;  // dark charcoal body
-      const HUB_L = 0x7A7A92; // highlight rim
-      const HUB_D = 0x28282E; // shadow
-      const RIM   = 0x5C5C70;
+      const HUB  = P.GREY_2;  // dark charcoal body
+      const HUB_L = P.GREY_4; // highlight rim
+      const HUB_D = P.GREY_1; // shadow
+      const RIM   = P.GREY_3;
       // Outer body
       px(g, HUB,   2,  2, 24, 24);
       // Rim highlight (top-left)
@@ -705,7 +721,7 @@ class BootScene extends Phaser.Scene {
       // Center axle boss
       px(g, HUB_D, 10, 10,  8,  8);
       px(g, HUB_L, 11, 10,  4,  2);
-      px(g, 0x111118, 12, 12,  4,  4);  // axle hole
+      px(g, P.INK, 12, 12,  4,  4);  // axle hole
       // Attachment bolt holes (4 cardinal)
       for (const [bx,by] of [[6,13],[20,13],[13,6],[13,20]]) {
         px(g, HUB_D, bx, by, 2, 2);
@@ -718,18 +734,18 @@ class BootScene extends Phaser.Scene {
     // Structure: [arm 10px][airfoil body 54px][yellow tip 12px]
     {
       const g = this.make.graphics({ add: false });
-      const ARM  = 0x3A3A46;  // mounting arm — darker than blade
-      const BL   = 0x555568;  // charcoal blade body (Powerfoil dark gray)
-      const BL_L = 0x7A7A90;  // upper surface highlight
-      const BL_D = 0x2E2E38;  // lower surface shadow
-      const TIP  = 0xFFC425;  // Big Ass Fans yellow tip
-      const TIP_L = 0xFFE066;
-      const TIP_D = 0xCC9000;
+      const ARM  = P.GREY_2;  // mounting arm — darker than blade
+      const BL   = P.GREY_3;  // charcoal blade body (Powerfoil dark gray)
+      const BL_L = P.GREY_4;  // upper surface highlight
+      const BL_D = P.GREY_1;  // lower surface shadow
+      const TIP  = P.YEL;     // Big Ass Fans yellow tip
+      const TIP_L = P.YEL_L;
+      const TIP_D = P.YEL_D;
 
       // ── Mounting arm (root stub from hub to blade) — narrow rod
       px(g, ARM,  0, 3, 10, 3);      // arm body center
-      px(g, 0x4E4E60, 0, 3, 10, 1);  // arm top highlight
-      px(g, 0x222228, 0, 5, 10, 1);  // arm bottom shadow
+      px(g, P.GREY_3, 0, 3, 10, 1);  // arm top highlight
+      px(g, P.GREY_1, 0, 5, 10, 1);  // arm bottom shadow
 
       // ── Airfoil body
       px(g, BL,   10, 2, 54, 5);     // main airfoil slab
@@ -745,7 +761,7 @@ class BootScene extends Phaser.Scene {
       px(g, TIP_D,64, 6, 12, 1);     // tip shadow
 
       // Attachment bolt on arm
-      px(g, 0x5A5A6E, 4, 3, 3, 2);
+      px(g, P.GREY_3, 4, 3, 3, 2);
 
       g.generateTexture('fan_blade', 76, 9);
       g.destroy();
@@ -754,7 +770,7 @@ class BootScene extends Phaser.Scene {
     // ── FAN MOUNT (ceiling bracket) — wider to match larger hub
     {
       const g = this.make.graphics({ add: false });
-      const MT = 0x3A3A46; const MT_L = 0x6A6A80; const MT_D = 0x1E1E26;
+      const MT = P.GREY_2; const MT_L = P.GREY_4; const MT_D = P.INK;
       px(g, MT,   0,  0, 100, 10);
       px(g, MT_L, 0,  0, 100,  3);
       px(g, MT_D, 0,  8, 100,  4);
@@ -777,14 +793,14 @@ class BootScene extends Phaser.Scene {
       const W = 200, H = 16;
       const g = this.make.graphics({ add: false });
       // Top highlight
-      px(g, C.COL.SHELF_LIGHT, 0,  0, W,  3);
+      px(g, P.GREY_5, 0,  0, W,  3);
       // Main shelf body
-      px(g, C.COL.SHELF_METAL, 0,  3, W,  8);
+      px(g, P.GREY_4, 0,  3, W,  8);
       // Shelf shadow
-      px(g, C.COL.SHELF_DARK,  0, 11, W,  5);
+      px(g, P.GREY_2,  0, 11, W,  5);
       // Rivets
       for (let x = 12; x < W - 12; x += 40) {
-        px(g, C.COL.CONCRETE_L, x, 5, 3, 3);
+        px(g, P.GREY_5, x, 5, 3, 3);
       }
       g.generateTexture('shelf', W, H);
       g.destroy();
@@ -794,14 +810,14 @@ class BootScene extends Phaser.Scene {
     {
       const S = 18;
       const g = this.make.graphics({ add: false });
-      px(g, C.COL.BOX_TAN,   0,  0, S,   S);
-      px(g, C.COL.BOX_SHADE, 0,  0, S,   2);  // top shade
-      px(g, C.COL.BOX_DARK,  0, S-2, S,  2);  // bottom shadow
-      px(g, C.COL.BOX_DARK,  S-2, 0, 2,  S);  // right shadow
+      px(g, P.TAN,   0,  0, S,   S);
+      px(g, P.BROWN_3, 0,  0, S,   2);  // top shade
+      px(g, P.BROWN_2,  0, S-2, S,  2);  // bottom shadow
+      px(g, P.BROWN_2,  S-2, 0, 2,  S);  // right shadow
       // X cross on box face
       for (let i = 2; i < S - 2; i++) {
-        px(g, C.COL.BOX_DARK, i, i, 1, 1);
-        px(g, C.COL.BOX_DARK, S - 1 - i, i, 1, 1);
+        px(g, P.BROWN_2, i, i, 1, 1);
+        px(g, P.BROWN_2, S - 1 - i, i, 1, 1);
       }
       g.generateTexture('box', S, S);
       g.destroy();
@@ -813,13 +829,13 @@ class BootScene extends Phaser.Scene {
       const g = this.make.graphics({ add: false });
       // Boards
       for (let x = 0; x < W; x += 16) {
-        px(g, C.COL.PALLET,   x,  0, 14,  H);
-        px(g, C.COL.PALLET_D, x + 12, 0,  2, H);
+        px(g, P.TAN_D,   x,  0, 14,  H);
+        px(g, P.BROWN_2, x + 12, 0,  2, H);
       }
       // Top slats
-      px(g, C.COL.PALLET,   0, 0, W, 3);
-      px(g, C.COL.PALLET,   0, 6, W, 3);
-      px(g, C.COL.PALLET_D, 0, H-2, W, 2);
+      px(g, P.TAN_D,   0, 0, W, 3);
+      px(g, P.TAN_D,   0, 6, W, 3);
+      px(g, P.BROWN_2, 0, H-2, W, 2);
       g.generateTexture('pallet', W, H);
       g.destroy();
     }
@@ -828,12 +844,12 @@ class BootScene extends Phaser.Scene {
     {
       const W = 12, H = 200;
       const g = this.make.graphics({ add: false });
-      px(g, C.COL.SHELF_METAL, 0, 0, W, H);
-      px(g, C.COL.SHELF_LIGHT, 1, 0, 3, H);
-      px(g, C.COL.SHELF_DARK,  W-3, 0, 3, H);
+      px(g, P.GREY_4, 0, 0, W, H);
+      px(g, P.GREY_5, 1, 0, 3, H);
+      px(g, P.GREY_2,  W-3, 0, 3, H);
       // Bolt holes
       for (let y = 16; y < H; y += 32) {
-        px(g, C.COL.SHELF_DARK, 4, y, 4, 4);
+        px(g, P.GREY_2, 4, y, 4, 4);
       }
       g.generateTexture('shelf_upright', W, H);
       g.destroy();
