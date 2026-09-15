@@ -12,6 +12,8 @@ mkdirSync(OUT, { recursive: true });
 const browser = await launch();
 try {
   const { page, errors } = await openGame(browser, { startGame: false });
+  // Boot waits on the logo preload; without this a slow or unreachable server gives a sheet of green "missing" boxes.
+  await page.waitForFunction(() => window.__game.textures.exists('chimp'), null, { timeout: 20000 });
 
   if (keys.length) {
     const sheet = await page.evaluate((keys) => {
