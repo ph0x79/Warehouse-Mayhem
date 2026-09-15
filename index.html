@@ -149,46 +149,115 @@ class BootScene extends Phaser.Scene {
 
   makeWarehouseBackground() {
     const g = this.make.graphics({ x: 0, y: 0, add: false });
-    const W = C.WIDTH, H = C.HEIGHT;
+    // Painted on a 480x320 grid and shown at 2x, so every pixel here is a 2x2 block on screen.
+    const r = (c, x, y, w, h) => px(g, c, x, y, w, h);
 
-    // Ceiling band
-    px(g, P.NAVY,    0,  0, W,  60);
-    // Ceiling edge trim
-    px(g, P.GREY_3,  0, 58, W,   4);
-
-    // Back wall
-    px(g, P.GREY_3, 0, 60, W, H - 60);
-
-    // Subtle wall panel lines (vertical)
-    for (let x = 0; x < W; x += 80) {
-      px(g, P.GREY_2, x, 60, 2, H - 120);
+    // ── Ceiling: dark deck with steel trusses
+    r(P.GREY_1, 0, 0, 480, 34);
+    for (let x = 0; x < 480; x += 6) r(P.INK, x, 0, 3, 10);          // corrugated deck
+    r(P.INK, 0, 10, 480, 2);
+    r(P.GREY_2, 0, 24, 480, 2);                                      // truss bottom chord
+    r(P.GREY_2, 0, 12, 480, 1);                                      // top chord
+    for (let x = 0; x < 480; x += 24) {                              // truss zig-zag
+      for (let i = 0; i < 12; i++) { r(P.GREY_2, x + i, 12 + i, 1, 1); r(P.GREY_2, x + 23 - i, 12 + i, 1, 1); }
     }
-    // Horizontal panel lines
-    for (let y = 60; y < H - 80; y += 90) {
-      px(g, P.GREY_2, 0, y, W, 2);
+    r(P.INK, 0, 26, 480, 2);
+    r(P.GREY_1, 0, 28, 480, 6);
+
+    // ── Wall: corrugated metal cladding
+    const WT = 34, WB = 288;
+    r(P.GREY_2, 0, WT, 480, WB - WT);
+    for (let x = 0; x < 480; x += 8) {                               // ribs: light edge, dark valley
+      r(P.GREY_3, x, WT, 1, 216);
+      r(P.GREY_1, x + 5, WT, 1, 216);
     }
+    r(P.GREY_1, 0, WT, 480, 4);                                      // darker under the ceiling
+    for (const y of [96, 172]) { r(P.GREY_1, 0, y, 480, 2); r(P.GREY_3, 0, y + 2, 480, 1); }
 
-    // Floor
-    px(g, P.GREY_4,   0, H - 64, W, 64);
-    px(g, P.GREY_5, 0, H - 64, W,  4); // floor highlight
-    px(g, P.GREY_3, 0, H - 4,  W,  4); // floor shadow
+    // Block wainscot with a safety band along the bottom of the wall
+    r(P.GREY_2, 0, 250, 480, 38);
+    for (let y = 256; y < 288; y += 8) {
+      r(P.GREY_1, 0, y, 480, 1);
+      const off = (y / 8) % 2 ? 0 : 12;
+      for (let x = off; x < 480; x += 24) r(P.GREY_1, x, y, 1, 8);
+    }
+    r(P.YEL_DD, 0, 250, 480, 3);
+    r(P.GREY_1, 0, 253, 480, 1);
 
-    // Hazard stripes on floor
-    const stripeW = 28;
-    for (let x = -stripeW; x < W + stripeW; x += stripeW * 2) {
-      // Draw angled stripe as a series of horizontal slices
-      for (let row = 0; row < 64; row++) {
-        const offset = Math.floor(row * 0.8);
-        px(g, P.YEL, x + offset, H - 64 + row, stripeW, 1);
+    // ── Wall lamps: warm pools on the cladding
+    for (const lx of [150, 350]) {
+      for (let i = 0; i < 40; i += 2) {                              // short wide cone: lit flats, bright ribs
+        const halfW = 6 + Math.floor(i * 0.8);
+        for (let x = lx - halfW; x < lx + halfW; x++) {
+          const m = ((x % 8) + 8) % 8;
+          if (m === 5) continue;
+          r(m === 0 ? P.GREY_4 : P.GREY_3, x, 54 + i, 1, 2);
+        }
       }
-    }
-    // Overlay floor base color semi-opaque — use separate rects for grid look
-    // Floor grid lines
-    for (let x = 0; x < W; x += 64) {
-      px(g, P.GREY_3, x, H - 64, 1, 64);
+      r(P.GREY_1, lx - 1, 46, 2, 3);                                 // bracket from pipe
+      r(P.GREY_1, lx - 8, 49, 16, 3);                                // lamp housing
+      r(P.GREY_3, lx - 7, 50, 14, 1);
+      r(P.YEL_L, lx - 5, 52, 10, 2);                                 // lens
     }
 
-    g.generateTexture('background', W, H);
+    // ── Pipes along the top of the wall
+    r(P.GREY_1, 0, 46, 480, 1);
+    r(P.GREY_3, 0, 40, 480, 5);
+    r(P.GREY_4, 0, 41, 480, 1);
+    r(P.GREY_1, 0, 45, 480, 1);
+    for (let x = 20; x < 480; x += 64) { r(P.GREY_1, x, 39, 3, 7); } // brackets
+    r(P.GREY_3, 355, 45, 3, 205);                                    // conduit down the right gap
+    r(P.GREY_4, 355, 45, 1, 205);
+    r(P.GREY_1, 352, 120, 9, 4);
+    r(P.GREY_1, 352, 210, 9, 4);
+
+    // ── Roller door in the left-centre gap
+    const dx = 140, dw = 78, dy = 150;
+    r(P.GREY_1, dx - 4, dy - 8, dw + 8, WB - dy + 8);                // frame
+    r(P.BROWN_0, dx - 4, dy - 8, dw + 8, 6);                         // header box
+    r(P.GREY_3, dx, dy, dw, WB - dy);
+    for (let y = dy; y < WB; y += 5) { r(P.GREY_4, dx, y, dw, 1); r(P.GREY_2, dx, y + 4, dw, 1); }
+    r(P.YEL_DD, dx - 4, dy - 2, 3, WB - dy + 2);                     // hazard posts
+    r(P.YEL_DD, dx + dw + 1, dy - 2, 3, WB - dy + 2);
+    for (let y = dy; y < WB; y += 8) { r(P.GREY_1, dx - 4, y, 3, 3); r(P.GREY_1, dx + dw + 1, y, 3, 3); }
+    r(P.INK, dx, WB - 3, dw, 3);                                     // gap under door
+
+    // Sign above the door
+    const font = {
+      D: ['110','101','101','101','110'], O: ['111','101','101','101','111'],
+      C: ['111','100','100','100','111'], K: ['101','110','100','110','101'],
+      '2': ['111','001','111','100','111'],
+    };
+    const text = (s, x, y, c) => {
+      for (const ch of s) {
+        if (ch !== ' ') font[ch].forEach((row, j) => { for (let i = 0; i < 3; i++) if (row[i] === '1') r(c, x + i, y + j, 1, 1); });
+        x += 4;
+      }
+    };
+    r(P.GREY_3, dx + 21, 124, 36, 11);
+    r(P.YEL_DD, dx + 21, 134, 36, 1);
+    text('DOCK 2', dx + 28, 127, P.GREY_1);
+
+    // Fire extinguisher in the right-hand gap
+    r(P.RED, 364, 222, 6, 14);
+    r(P.ORANGE_D, 365, 223, 1, 12);
+    r(P.GREY_1, 365, 219, 4, 3);
+    r(P.GREY_1, 362, 236, 10, 2);
+
+    // ── Floor: polished concrete
+    r(P.GREY_3, 0, 288, 480, 32);
+    r(P.GREY_4, 0, 288, 480, 1);                                     // top lip
+    r(P.GREY_2, 0, 289, 480, 2);                                     // wall shadow on floor
+    r(P.YEL_DD, 0, 296, 480, 2);                                     // safety lane line
+    for (let x = -40; x < 520; x += 60) {                            // expansion joints
+      for (let y = 298; y < 320; y++) r(P.GREY_2, x + Math.floor((x - 240) * (y - 298) / 90), y, 1, 1);
+    }
+    r(P.GREY_2, 0, 309, 480, 1);
+    for (const lx of [150, 350]) { r(P.GREY_4, lx - 20, 302, 40, 1); r(P.GREY_4, lx - 12, 304, 24, 1); }
+    for (const [sx, sy] of [[40, 313], [90, 301], [260, 315], [300, 305], [430, 311]]) r(P.GREY_2, sx, sy, 6, 1);
+    r(P.GREY_2, 0, 318, 480, 2);
+
+    g.generateTexture('background', 480, 320);
     g.destroy();
   }
 
@@ -200,128 +269,133 @@ class BootScene extends Phaser.Scene {
     const g = this.make.graphics({ add: false });
     const px = (col, x, y, w, h) => { g.fillStyle(col, 1); g.fillRect(x, y, w, h); };
 
-    const BROWN      = P.BROWN_2;
-    const BROWN_D    = P.BROWN_0;
-    const BROWN_L    = P.TAN_D;
-    const FACE       = P.SKIN;
-    const FACE_D     = P.SKIN_D;
-    const VEST_YEL   = P.YEL;
-    const VEST_SHADE = P.YEL_D;
-    const VEST_DARK  = P.YEL_DD;
-    const HAT_YEL    = P.YEL;
-    const HAT_SHADE  = P.YEL_D;
-    const HAT_DARK   = P.YEL_DD;
-    const HAT_BRIM   = P.YEL_L;
-    const EYE        = P.INK;
-    const WHITE      = P.WHITE;
-    const REFL       = P.CREAM;
-    const EAR_IN     = P.SKIN_D;
-
-    // Draw one full chimp frame at pixel offset (ox, oy)
-    // legOff: leg animation offset (+/-3 or 0)
-    // armsUp: true for jump frame
-    const drawChimp = (frameIdx, legOff, armsUp) => {
-      const ox = frameIdx * FW;
-      const oy = 0;
-
-      // ── HARD HAT — dome sits at top, brim extends wider than head
-      // Dome (6px tall, 16px wide — clearly rounded via step pixels)
-      px(HAT_YEL,   ox+8,  oy+2,  12, 1);  // dome peak row (narrow)
-      px(HAT_YEL,   ox+6,  oy+3,  16, 1);  // widen
-      px(HAT_YEL,   ox+5,  oy+4,  18, 1);
-      px(HAT_BRIM,  ox+5,  oy+4,   4, 1);  // left highlight
-      px(HAT_YEL,   ox+5,  oy+5,  18, 2);
-      px(HAT_SHADE, ox+5,  oy+6,  18, 1);  // dome base shadow row
-      // Brim — wide flat shelf
-      px(HAT_YEL,   ox+2,  oy+7,  24, 2);  // brim top
-      px(HAT_DARK,  ox+2,  oy+9,  24, 2);  // brim underside shadow
-      // Strap hint
-      px(HAT_DARK,  ox+10, oy+9,   8, 1);
-
-      // ── HEAD — starts at y=10, height=13
-      // Main skull
-      px(BROWN,     ox+5,  oy+10, 18, 12);
-      px(BROWN_L,   ox+6,  oy+10, 16,  3);  // top highlight
-
-      // Big chimp EARS — wide discs sticking out on sides
-      // Left ear
-      px(BROWN,     ox+1,  oy+12,  6,  7);   // outer ear
-      px(BROWN_L,   ox+1,  oy+12,  3,  3);   // ear highlight
-      px(EAR_IN,    ox+2,  oy+14,  3,  4);   // inner ear pink
-
-      // Right ear
-      px(BROWN,     ox+21, oy+12,  6,  7);
-      px(BROWN_L,   ox+21, oy+12,  3,  3);
-      px(EAR_IN,    ox+22, oy+14,  3,  4);
-
-      // Face muzzle patch (light, protruding chimp muzzle)
-      px(FACE,      ox+7,  oy+15, 14,  8);
-      px(FACE_D,    ox+7,  oy+22,  14, 1);  // muzzle bottom shadow
-
-      // Eyes — set back from muzzle, over the brown skull area
-      px(EYE,       ox+7,  oy+12,  4,  4);
-      px(EYE,       ox+17, oy+12,  4,  4);
-      px(WHITE,     ox+8,  oy+12,  2,  2);  // eye shine left
-      px(WHITE,     ox+18, oy+12,  2,  2);  // eye shine right
-
-      // Eyebrow ridges (classic chimp look)
-      px(BROWN_D,   ox+6,  oy+11,  5,  2);
-      px(BROWN_D,   ox+17, oy+11,  5,  2);
-
-      // Nostrils
-      px(BROWN_D,   ox+10, oy+18,  2,  2);
-      px(BROWN_D,   ox+16, oy+18,  2,  2);
-
-      // Mouth line
-      px(BROWN_D,   ox+10, oy+20,  8,  1);
-      px(BROWN_D,   ox+11, oy+21,  6,  1);
-
-      // ── TORSO / VEST — y=23 to y=32
-      px(BROWN,     ox+6,  oy+23, 16,  9);   // body base
-      px(VEST_YEL,  ox+6,  oy+23, 16,  9);   // vest over body
-      px(VEST_SHADE,ox+6,  oy+23,  3,  9);   // left edge shadow
-      px(VEST_SHADE,ox+19, oy+23,  3,  9);   // right edge shadow
-      px(VEST_DARK, ox+6,  oy+31, 16,  1);   // bottom hem
-      // Reflective safety strips
-      px(REFL,      ox+7,  oy+25, 14,  2);
-      px(REFL,      ox+7,  oy+29, 14,  2);
-
-      // ── ARMS
-      if (armsUp) {
-        // Jump: arms raised
-        px(BROWN,   ox+2,  oy+17,  4,  9);   // left arm up
-        px(BROWN_D, ox+2,  oy+17,  4,  3);   // left hand
-        px(BROWN,   ox+22, oy+17,  4,  9);   // right arm up
-        px(BROWN_D, ox+22, oy+17,  4,  3);   // right hand
-      } else {
-        const la = legOff > 0 ? -2 : legOff < 0 ? 2 : 0;
-        const ra = -la;
-        px(BROWN,   ox+2,  oy+23+la, 4,  8);
-        px(BROWN_D, ox+2,  oy+29+la, 4,  3);
-        px(BROWN,   ox+22, oy+23+ra, 4,  8);
-        px(BROWN_D, ox+22, oy+29+ra, 4,  3);
-      }
-
-      // ── LEGS — y=32 to y=42
-      const ll =  legOff;
-      const rl = -legOff;
-      // Left leg
-      px(BROWN,     ox+7,  oy+32+ll,  5,  8);
-      px(BROWN_D,   ox+6,  oy+39+ll,  7,  3);   // foot
-      // Right leg
-      px(BROWN,     ox+16, oy+32+rl,  5,  8);
-      px(BROWN_D,   ox+15, oy+39+rl,  7,  3);   // foot
-
-      // ── TAIL
-      px(BROWN,     ox+22, oy+26,  3,  2);
-      px(BROWN,     ox+24, oy+24,  2,  4);
-      px(BROWN_L,   ox+25, oy+22,  2,  3);
+    // One char per pixel. k is the outline, h/y/d/D the hat and vest yellows, f/b/n/o the fur,
+    // t/T skin, w/g/G the vest strips and eyes, m/r the mouth.
+    const KEY = {
+      '.': null, k: P.INK,
+      h: P.YEL_L, y: P.YEL, d: P.YEL_D, D: P.YEL_DD,
+      f: P.BROWN_3, b: P.BROWN_2, n: P.BROWN_1, o: P.BROWN_0,
+      t: P.TAN, T: P.TAN_D,
+      w: P.WHITE, g: P.GREY_6, G: P.GREY_5,
+      m: P.RED, r: P.RED_L,
     };
 
-    drawChimp(0,  0, false);   // idle
-    drawChimp(1,  3, false);   // walk A
-    drawChimp(2, -3, false);   // walk B
-    drawChimp(3,  0, true);    // jump
+    // Head rows 0-19, torso rows 20-31, legs rows 32-43. Torso and leg rows are a left half
+    // plus a right half of 14 chars each, so poses swap one side without redrawing the other.
+    const HEAD = [
+      '..........kkkkkkkk..........',
+      '........kkhhhhyyyykk........',
+      '.......khhyyyyyyyyydk.......',
+      '......khyyyyyyyyyyyydk......',
+      '.....khyyyyyyyyyyyyyddk.....',
+      '.....khyyyyyyyyyyyydddk.....',
+      '..khhhhyyyyyyyyyyyyyyyyydk..',
+      '...kddddddddddddddddddddk...',
+      '....kknnnnnnnnnnnnnnnnkk....',
+      '.....kfbbbbbbbbbbbbbbnk.....',
+      '.....kbooooobbbbooooonk.....',
+      '..kkkkbowwwottttowwwonkkkk..',
+      '.kbtTnbwwkkwttttwwkkwnntTnk.',
+      '.kbtTnbwwkkwttttwwkkwnntTnk.',
+      '.knTTnbtwwwttttttwwwtnnTTnk.',
+      '..knnnb' + 'tttttottottttt' + 'bnnnk..',
+      '...kknbtkttttttttttktbnkk...',
+      '.....knTkwwwwwwwwwwkTnk.....',
+      '.....knTTkmrrrrrrmkTTnk.....',
+      '......knTTkkkkkkkkTTnk......',
+    ];
+
+    const E = '..............';
+    const half  = pairs => pairs.map(([l, r]) => l + r);
+    const zip   = (L, R) => L.map((l, i) => [l, R[i]]);
+    const patch = (row, col, s) => row.slice(0, col) + s + row.slice(col + s.length);
+
+    // Vest band (V) with white and grey reflective strips (S1, S2).
+    const V  = ['...kfbnhyyyyyy', 'yyyyydDbnnk...'];
+    const S1 = ['...kfbnwwwwwww', 'wwwwwggbnnk...'];
+    const S2 = ['...kfbnggggggg', 'gggggGGbnnk...'];
+    const TOP = [
+      ['....kkkkkkkkkk', 'kkkkkkkkkk....'],
+      ['...kfbnhhyyyyy', 'yyyyydDbnnk...'],
+      V, V, S1, S2, V, V, S1, S2, V,
+      ['...kfbnddddddd', 'ddddddDbnnk...'],
+    ];
+
+    const idleL = ['...kttTknnnnnn', '....kkkkfbbbbb', '.......kfbbnkk', '.......kfbbnk.', '.......kfbbnk.', '.......kfbbnk.',
+      '....kkknbbbnk.', '...kfbbbbbbnk.', '...knnnnnnnnk.', '....kkkkkkkkk.', E, E];
+    const idleR = ['nnnnnnktTTk...', 'bnnnnnkkkk....', 'kkbbnnknnk....', '.kbbnnkknnk...', '.kbbnnk.knnk..', '.kbbnnk..kkk..',
+      '.kbbnnnkkk....', '.kbbnnnnnnk...', '.knnnnnnnnk...', '.kkkkkkkkk....', E, E];
+    const idle = [...HEAD, ...half(TOP), ...half(zip(idleL, idleR))];
+
+    // walkA raises the left arm and lifts the left foot; walkB mirrors it.
+    const walkA = [...HEAD, ...half([
+      ...TOP.slice(0, 8),
+      ['...kttTwwwwwww', S1[1]],
+      ['...kTTTggggggg', S2[1]],
+      ['....kkkhyyyyyy', V[1]],
+      ['......kddddddd', TOP[11][1]],
+      ['......kknnnnnn', 'nnnnnnkbnnk...'],
+      ['.......kfbbbbb', 'bnnnnnktTTk...'],
+      ['.......kfbbnkk', 'kkbbnnktTTk...'],
+      ['.......kfbbnk.', '.kbbnnkkkk....'],
+      ['.....kkkbbbnk.', '.kbbnnkknnk...'],
+      ['...kfbbbbbbnk.', '.kbbnnk.knnk..'],
+      ['...knnnnnnnnk.', '.kbbnnnkkkkk..'],
+      ['....kkkkkkkkk.', idleR[7]],
+      [E, idleR[8]],
+      [E, idleR[9]],
+      [E, E], [E, E],
+    ])];
+    const walkB = [...HEAD, ...half([
+      ...TOP.slice(0, 8),
+      [S1[0], 'wwwwwggtTTk...'],
+      [S2[0], 'gggggGGTTTk...'],
+      [V[0], 'yyyyydDkkk....'],
+      [TOP[11][0], 'ddddddDk......'],
+      ['...kfbnknnnnnn', 'nnnnnnk.......'],
+      ['...kttTkfbbbbb', 'bnnnnnk.......'],
+      ['...ktTTkfbbnkk', 'kkbbnnknnk....'],
+      ['....kkkkfbbnk.', '.kbbnnkknnk...'],
+      [idleL[4], '.kbbnnnkknnk..'],
+      [idleL[5], '.kbbnnnnnnkk..'],
+      [idleL[6], '.knnnnnnnnk...'],
+      [idleL[7], '.kkkkkkkkk....'],
+      [idleL[8], E],
+      [idleL[9], E],
+      [E, E], [E, E],
+    ])];
+
+    // jump: both fists up beside the jaw, legs tucked.
+    const jHead = HEAD.slice();
+    jHead[17] = patch(patch(jHead[17], 0, '.kk.'), 24, '.kk.');
+    jHead[18] = patch(patch(jHead[18], 0, 'ktTk'), 24, 'ktTk');
+    jHead[19] = patch(patch(jHead[19], 0, 'kTTk'), 24, 'kTTk');
+    const jV  = ['......khyyyyyy', 'yyyyydDk......'];
+    const jS1 = ['......kwwwwwww', 'wwwwwggk......'];
+    const jS2 = ['......kggggggg', 'gggggGGk......'];
+    const jump = [...jHead, ...half([
+      ['.kfnkkkkkkkkkk', 'kkkkkkkkkkbnk.'],
+      ['..kfbnnhyyyyyy', 'yyyyydDnbnnk..'],
+      ['...kbnnhyyyyyy', 'yyyyydDnbnk...'],
+      ['....kknhyyyyyy', 'yyyyydDnkk....'],
+      jS1, jS2, jV, jV, jS1, jS2, jV,
+      ['......kddddddd', 'ddddddDk......'],
+      ['.......knnnnnn', 'nnnnnnknnk....'],
+      ['.......kfbbbbb', 'bnnnnnkknnk...'],
+      ['......kfbbbnkk', 'kkbbbnnk.kkk..'],
+      ['.....kfbbbnk..', '..kbbbnnk.....'],
+      ['....kfbbbbnk..', '..kbbbnnnk....'],
+      ['....knnnnnnk..', '..knnnnnnk....'],
+      ['.....kkkkkk...', '...kkkkkk.....'],
+      [E, E], [E, E], [E, E], [E, E], [E, E],
+    ])];
+
+    [idle, walkA, walkB, jump].forEach((rows, i) => {
+      rows.forEach((row, y) => [...row].forEach((ch, x) => {
+        const col = KEY[ch];
+        if (col != null) px(col, i * FW + x, y, 1, 1);
+      }));
+    });
 
     g.generateTexture('chimp', FW * frames, FH);
     g.destroy();
@@ -979,7 +1053,7 @@ class GameScene extends Phaser.Scene {
   constructor() { super('Game'); }
 
   create() {
-    this.add.image(0, 0, 'background').setOrigin(0, 0);
+    this.add.image(0, 0, 'background').setOrigin(0, 0).setScale(2);
 
     this.platforms = this.physics.add.staticGroup(); // floor + shelves — everything collides
     this.pallets   = this.physics.add.staticGroup(); // pallet steps — player/poop only
