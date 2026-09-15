@@ -2245,8 +2245,7 @@ const config = {
   scene: [BootScene, TitleScene, GameScene, GameOverScene, EnterInitialsScene, PauseScene],
   parent: document.body,
   scale: {
-    mode: Phaser.Scale.EXPAND,
-    autoCenter: Phaser.Scale.CENTER_BOTH
+    mode: Phaser.Scale.FIT   // body CSS flex centres the canvas; autoCenter would double the offset
   }
 };
 
