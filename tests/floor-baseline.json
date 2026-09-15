@@ -1,0 +1,7 @@
+[
+ {"name": "worker", "bottom": 576, "bodyW": 32, "bodyH": 68, "displayW": 32, "displayH": 68, "onFloor": true},
+ {"name": "blade", "bottom": 576, "bodyW": 48, "bodyH": 68, "displayW": 48, "displayH": 68, "onFloor": true},
+ {"name": "guard", "bottom": 576, "bodyW": 32, "bodyH": 68, "displayW": 32, "displayH": 68, "onFloor": true},
+ {"name": "manager", "bottom": 576, "bodyW": 32, "bodyH": 68, "displayW": 32, "displayH": 68, "onFloor": true},
+ {"name": "boss", "bottom": 576, "bodyW": 48, "bodyH": 102, "displayW": 48, "displayH": 102, "onFloor": true}
+]
