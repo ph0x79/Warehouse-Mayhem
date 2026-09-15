@@ -130,6 +130,10 @@ async function fetchTopScores() {
 const px = (g, col, x, y, w, h) => { g.fillStyle(col, 1); g.fillRect(x, y, w, h); };
 const P = C.PAL;
 
+// Paint a pixel grid at ox: rows of chars, key maps a char to a colour (null = transparent).
+const paintGrid = (g, rows, key, ox = 0) => rows.forEach((row, y) =>
+  [...row].forEach((ch, x) => { const col = key[ch]; if (col != null) px(g, col, ox + x, y, 1, 1); }));
+
 class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
 
@@ -390,12 +394,7 @@ class BootScene extends Phaser.Scene {
       [E, E], [E, E], [E, E], [E, E], [E, E],
     ])];
 
-    [idle, walkA, walkB, jump].forEach((rows, i) => {
-      rows.forEach((row, y) => [...row].forEach((ch, x) => {
-        const col = KEY[ch];
-        if (col != null) px(col, i * FW + x, y, 1, 1);
-      }));
-    });
+    [idle, walkA, walkB, jump].forEach((rows, i) => paintGrid(g, rows, KEY, i * FW));
 
     g.generateTexture('chimp', FW * frames, FH);
     g.destroy();
@@ -488,53 +487,104 @@ class BootScene extends Phaser.Scene {
 
   makeEnemyTextures() {
 
-    // Shared human body colors
-    const SKIN   = P.SKIN;
-    const SKIN_D = P.SKIN_D;
-    const EYE    = P.INK;
-    const WHITE  = P.WHITE;
-    const BOOT   = P.GREY_1;
+    const WHITE = P.WHITE;   // still used by the clipboard texture below
 
-    // Helper: draw a generic worker head at (ox, oy) on graphics g
-    const head = (g, ox, oy, hatCol, hatDk) => {
-      px(g, hatCol,  ox+3, oy+0,  10, 4);   // hat
-      px(g, hatDk,   ox+2, oy+3,  12, 2);   // hat brim
-      px(g, SKIN,    ox+3, oy+5,  10, 8);   // head
-      px(g, SKIN_D,  ox+3, oy+12,  10, 1);  // chin shadow
-      px(g, EYE,     ox+5, oy+7,   2, 2);   // left eye
-      px(g, EYE,     ox+9, oy+7,   2, 2);   // right eye
-      px(g, WHITE,   ox+5, oy+7,   1, 1);
-      px(g, WHITE,   ox+9, oy+7,   1, 1);
-      px(g, SKIN_D,  ox+6, oy+10,  4, 1);   // mouth
+    // ── SHARED HUMAN GRIDS — 16x34: rows 0-4 hat, 5-13 face, 14-23 torso, 24-31 legs, 32-33 empty.
+    // The planted foot's lowest pixel is row 31. Generic chars let each role recolour one grid:
+    // c/v/V shirt, q/p/P trousers, b/B boots, h/H/j hat, s/S skin, k ink.
+    const patch = (row, col, s) => row.slice(0, col) + s + row.slice(col + s.length);
+    const pad = (rows, n) => rows.map(r => '.'.repeat(n) + r + '.'.repeat(n));
+    const EMPTY = '.'.repeat(16);
+
+    // Rows 5-13. Big cartoon head to match the chimp, lit from the top-left.
+    const FACE = [
+      '.kssssssssssSSk.',
+      '.kssssssssssSSk.',
+      '.ksswksssswkSSk.',
+      '.ksswksssswkSSk.',
+      '.kssssssssssSSk.',
+      '.ksssskkkkSSSSk.',
+      '.kssssssssssSSk.',
+      '.kkSSSSSSSSSSkk.',
+      '...kkSSSSSSkk...',
+    ];
+
+    // Rows 0-4: hard hat, peaked cap and bare hair, one per role for distinct silhouettes.
+    const HARD_HAT = [
+      '.....kkkkkk.....',
+      '....khhhhhHk....',
+      '...khhhhhhhHk...',
+      '.kkHHHHHHHHHHkk.',
+      '.kjjjjjjjjjjjjk.',
+    ];
+    const CAP = [
+      '.....kkkkkk.....',
+      '....khhhhhHk....',
+      '...khhhhhhhHk...',
+      '.kkHHHHHHHHHHkk.',
+      '.kjjjjjjjjjjjjjk',
+    ];
+    const HAIR = [
+      '.....kkkkkk.....',
+      '....khhhhhHk....',
+      '...khhhhhhhHk...',
+      '.kkhhhhhhhHHHkk.',
+      '.kHHHHHHHHHHHHk.',
+    ];
+
+    // Torso rows 14-23. Columns: 0 ink | 1-2 arm | 3 ink | 4-11 torso | 12 ink | 13-14 arm | 15 ink.
+    const SHIRT_ROW = 'cvvvvvVV';
+    const BELT_ROW  = 'PPPPPPPP';
+    const SLV_L = 'cv', SLV_R = 'vV', HAND = 'sS';
+    // A raised arm ends two rows higher than a lowered one. Each arm gets an ink cap row under
+    // the hand, so the silhouette keeps its 1px outline the whole way round.
+    const armState = (short, y) =>
+      short ? (y <= 17 ? 'slv' : y <= 20 ? 'hand' : y === 21 ? 'cap' : 'off')
+            : (y <= 19 ? 'slv' : y <= 22 ? 'hand' : 'cap');
+
+    // `hi` is the side whose arm is raised.
+    const torso = (hi) => {
+      const L = hi === 'L';
+      const rows = ['k'.repeat(16)];
+      for (let y = 15; y <= 23; y++) {
+        const ls = armState(L, y), rs = armState(!L, y);
+        const lp = ls === 'off' ? '...k' : ls === 'cap' ? 'kkkk' : 'k' + (ls === 'slv' ? SLV_L : HAND) + 'k';
+        const rp = rs === 'off' ? 'k...' : rs === 'cap' ? 'kkkk' : 'k' + (rs === 'slv' ? SLV_R : HAND) + 'k';
+        rows.push(lp + (y === 23 ? BELT_ROW : SHIRT_ROW) + rp);
+      }
+      return rows;
     };
 
-    // Helper: generic body/legs
-    const body = (g, ox, oy, shirtCol, shirtDk, legCol, legOff) => {
-      px(g, shirtCol, ox+3, oy+13, 10, 9);
-      px(g, shirtDk,  ox+3, oy+13,  2, 9);
-      px(g, shirtDk,  ox+11,oy+13,  2, 9);
-      // arms
-      px(g, SKIN,     ox+1, oy+14,  2, 7);
-      px(g, SKIN,     ox+13,oy+14,  2, 7);
-      // legs
-      const ll =  legOff, rl = -legOff;
-      px(g, legCol,   ox+4, oy+22+ll, 4, 8);
-      px(g, legCol,   ox+8, oy+22+rl, 4, 8);
-      px(g, BOOT,     ox+3, oy+29+ll, 5, 3);
-      px(g, BOOT,     ox+8, oy+29+rl, 5, 3);
+    // Leg rows 24-31. The planted leg runs trousers 24-28 and boot 29-31; the raised leg stops short.
+    const LT = '....kqpPk', LB1 = '...kbbbbk', LB2 = '...kBBBBk', LS = '...kkkkkk', LE = '........k';
+    const RT = 'ppPk...',   RB1 = 'bbbbk..',   RB2 = 'BBBBk..',   RS = 'kkkkk..',   RE = '.......';
+    const DOWN_L = [LT, LT, LT, LT, LT, LB1, LB2, LS];
+    const UP_L   = [LT, LT, LB1, LB2, LS, LE, LE, LE];
+    const DOWN_R = [RT, RT, RT, RT, RT, RB1, RB2, RS];
+    const UP_R   = [RT, RT, RB1, RB2, RS, RE, RE, RE];
+    const legs = (hi) => {
+      const [l, r] = hi === 'L' ? [UP_L, DOWN_R] : [DOWN_L, UP_R];
+      return l.map((s, i) => s + r[i]);
     };
 
-    // ── WAREHOUSE WORKER (blue shirt, tan pants) — 2 walk frames
+    // Contralateral gait: the raised arm goes with the opposite raised leg.
+    const build = (hat, hi) => [
+      ...hat, ...FACE, ...torso(hi), ...legs(hi === 'L' ? 'R' : 'L'), EMPTY, EMPTY,
+    ];
+
+    // ── WAREHOUSE WORKER (grey hard hat, blue shirt) — the plain one, no props
     {
-      const SHIRT = P.BLUE; const SHIRT_D = P.BLUE_D;
-      const PANTS = P.GREY_4;
+      const KEY = {
+        '.': null, k: P.INK,
+        s: P.SKIN, S: P.SKIN_D, w: P.WHITE,
+        h: P.GREY_5, H: P.GREY_4, j: P.GREY_3,   // hard hat
+        c: P.SKY, v: P.BLUE, V: P.BLUE_D,        // shirt
+        q: P.GREY_4, p: P.GREY_3, P: P.GREY_2,   // trousers and belt
+        b: P.GREY_2, B: P.GREY_1,                // boots
+      };
       const g = this.make.graphics({ add: false });
-      // frame 0
-      head(g,  0, 0, P.GREY_4, P.GREY_3);
-      body(g,  0, 0, SHIRT, SHIRT_D, PANTS,  3);
-      // frame 1
-      head(g, 16, 0, P.GREY_4, P.GREY_3);
-      body(g, 16, 0, SHIRT, SHIRT_D, PANTS, -3);
+      paintGrid(g, build(HARD_HAT, 'L'), KEY, 0);
+      paintGrid(g, build(HARD_HAT, 'R'), KEY, 16);
       g.generateTexture('worker', 32, 34);
       g.destroy();
       this.textures.get('worker').add(0, 0,  0, 0, 16, 34);
@@ -544,22 +594,34 @@ class BootScene extends Phaser.Scene {
         frameRate:6, repeat:-1 });
     }
 
-    // ── WORKER WITH FAN BLADE (orange vest, carrying long blade)
+    // ── WORKER WITH FAN BLADE (white hat, orange hi-vis, blade carried at waist height)
+    // 24 wide: the same 16-wide human padded 4 each side, with the blade drawn over him.
     {
-      const VEST = P.ORANGE; const VEST_D = P.ORANGE_D;
-      const BLADE = P.GREY_6; const BLADE_D = P.GREY_4;
+      const KEY = {
+        '.': null, k: P.INK,
+        s: P.SKIN, S: P.SKIN_D,
+        h: P.WHITE, H: P.GREY_6, j: P.GREY_4,        // white hard hat
+        c: P.ORANGE_L, v: P.ORANGE, V: P.ORANGE_D,   // hi-vis vest
+        w: P.WHITE, g: P.GREY_5,                     // reflective band
+        q: P.GREY_3, p: P.GREY_2, P: P.GREY_1,       // trousers and belt
+        b: P.GREY_2, B: P.GREY_1,                    // boots
+        l: P.GREY_6, L: P.GREY_4,                    // fan blade
+      };
+      const frame = (hi) => {
+        const rows = pad(build(HARD_HAT, hi), 4);
+        rows[17] = patch(rows[17], 8, 'wwwwwwgg');   // reflective band across the vest
+        rows[18] = patch(rows[18], 8, 'wwwwwwgg');
+        const y = hi === 'L' ? 19 : 20;              // blade bobs 1px between frames
+        rows[y]     = 'k'.repeat(24);
+        rows[y + 1] = 'k' + 'l'.repeat(22) + 'k';
+        rows[y + 2] = 'k' + 'L'.repeat(22) + 'k';
+        rows[y + 3] = 'k'.repeat(24);
+        rows[y] = patch(patch(rows[y], 5, 'sS'), 17, 'sS');   // hands gripping the top edge
+        return rows;
+      };
       const g = this.make.graphics({ add: false });
-      // frame 0
-      head(g,  0, 0, P.ORANGE_L, P.ORANGE_D);
-      body(g,  0, 0, VEST, VEST_D, P.GREY_2, 2);
-      // fan blade — long horizontal bar carried at waist height
-      px(g, BLADE,  -8, 16, 40, 5);
-      px(g, BLADE_D,-8, 20, 40, 2);
-      // frame 1
-      head(g, 24, 0, P.ORANGE_L, P.ORANGE_D);
-      body(g, 24, 0, VEST, VEST_D, P.GREY_2, -2);
-      px(g, BLADE,  16, 16, 40, 5);
-      px(g, BLADE_D,16, 20, 40, 2);
+      paintGrid(g, frame('L'), KEY, 0);
+      paintGrid(g, frame('R'), KEY, 24);
       g.generateTexture('worker_blade', 48, 34);
       g.destroy();
       this.textures.get('worker_blade').add(0, 0,  0, 0, 24, 34);
@@ -569,25 +631,30 @@ class BootScene extends Phaser.Scene {
         frameRate:5, repeat:-1 });
     }
 
-    // ── SECURITY GUARD (black uniform, cap)
+    // ── SECURITY GUARD (peaked cap, near-black uniform, yellow badge, pistol in the low hand)
     {
-      const SHIRT = P.GREY_1; const SHIRT_D = P.INK;
-      const PANTS = P.GREY_1;
+      const KEY = {
+        '.': null, k: P.INK,
+        s: P.SKIN, S: P.SKIN_D, w: P.WHITE,
+        h: P.GREY_3, H: P.GREY_2, j: P.GREY_1,   // cap
+        c: P.GREY_3, v: P.GREY_2, V: P.GREY_1,   // uniform shirt
+        q: P.GREY_3, p: P.GREY_2, P: P.GREY_1,   // trousers and belt
+        b: P.GREY_2, B: P.GREY_1,                // boots
+        y: P.YEL,                                // badge
+        G: P.GREY_5,                             // pistol, light so it reads on the dark uniform
+      };
+      const frame = (hi) => {
+        const rows = build(CAP, hi);
+        rows[17] = patch(rows[17], 5, 'yy');     // badge on the chest
+        rows[18] = patch(rows[18], 5, 'yy');
+        const y = hi === 'L' ? 23 : 21;          // pistol hangs off whichever hand is low
+        for (let i = 0; i < 3; i++) rows[y + i] = patch(rows[y + i], 12, 'kGGk');
+        rows[y + 3] = patch(rows[y + 3], 12, 'kkkk');
+        return rows;
+      };
       const g = this.make.graphics({ add: false });
-      // frame 0
-      head(g,  0, 0, P.INK, P.INK);
-      body(g,  0, 0, SHIRT, SHIRT_D, PANTS,  3);
-      // badge
-      px(g, P.YEL, 5, 16, 3, 3);
-      // gun arm (right arm extended)
-      px(g, SKIN,    13, 14,  2, 5);
-      px(g, P.GREY_2,14, 18,  3, 2); // gun
-      // frame 1
-      head(g, 16, 0, P.INK, P.INK);
-      body(g, 16, 0, SHIRT, SHIRT_D, PANTS, -3);
-      px(g, P.YEL,21, 16, 3, 3);
-      px(g, SKIN,    29, 14,  2, 5);
-      px(g, P.GREY_2,30, 18,  3, 2);
+      paintGrid(g, frame('L'), KEY, 0);
+      paintGrid(g, frame('R'), KEY, 16);
       g.generateTexture('guard', 32, 34);
       g.destroy();
       this.textures.get('guard').add(0, 0,  0, 0, 16, 34);
@@ -597,28 +664,31 @@ class BootScene extends Phaser.Scene {
         frameRate:7, repeat:-1 });
     }
 
-    // ── MANAGER (white shirt, tie, clipboard)
+    // ── MANAGER (bare head, white shirt, red tie, clipboard held to the chest)
     {
-      const SHIRT = P.WHITE; const SHIRT_D = P.GREY_6;
-      const TIE   = P.RED;
+      const KEY = {
+        '.': null, k: P.INK,
+        s: P.SKIN, S: P.SKIN_D,
+        h: P.BROWN_2, H: P.BROWN_1, j: P.BROWN_0,   // hair
+        c: P.WHITE, v: P.GREY_6, V: P.GREY_5,       // shirt
+        R: P.RED_L, r: P.RED,                       // tie
+        q: P.GREY_3, p: P.GREY_2, P: P.GREY_1,      // trousers and belt
+        b: P.GREY_2, B: P.GREY_1,                   // boots
+        T: P.TAN_D, w: P.WHITE, G: P.GREY_4,        // clipboard
+      };
+      const frame = (hi) => {
+        const rows = build(HAIR, hi);
+        rows[15] = patch(rows[15], 6, 'VRrV');      // collar notch, then the tie
+        for (let y = 16; y <= 21; y++) rows[y] = patch(rows[y], 7, 'Rr');
+        // Clipboard bobs 1px between frames; the tan frame keeps the paper off the white shirt.
+        const y0 = hi === 'L' ? 18 : 17;
+        ['kkkkkkk', 'kTTTTTk', 'kTwwwTk', 'kTGGGTk', 'kTwwwTk', 'kkkkkkk']
+          .forEach((r, i) => { rows[y0 + i] = patch(rows[y0 + i], 9, r); });
+        return rows;
+      };
       const g = this.make.graphics({ add: false });
-      // frame 0
-      head(g,  0, 0, P.GREY_1, P.INK);
-      body(g,  0, 0, SHIRT, SHIRT_D, P.GREY_2,  2);
-      px(g, TIE, 7, 14, 2, 8);  // tie
-      // clipboard in right hand
-      px(g, P.TAN, 13, 14, 5, 7);
-      px(g, WHITE,    14, 15, 3, 5);
-      px(g, P.GREY_3, 14, 16, 3, 1);
-      px(g, P.GREY_3, 14, 18, 3, 1);
-      // frame 1 (mid-stride)
-      head(g, 16, 0, P.GREY_1, P.INK);
-      body(g, 16, 0, SHIRT, SHIRT_D, P.GREY_2, -2);
-      px(g, TIE, 23, 14, 2, 8);
-      px(g, P.TAN, 29, 14, 5, 7);
-      px(g, WHITE,    30, 15, 3, 5);
-      px(g, P.GREY_3, 30, 16, 3, 1);
-      px(g, P.GREY_3, 30, 18, 3, 1);
+      paintGrid(g, frame('L'), KEY, 0);
+      paintGrid(g, frame('R'), KEY, 16);
       g.generateTexture('manager', 32, 34);
       g.destroy();
       this.textures.get('manager').add(0, 0,  0, 0, 16, 34);
@@ -702,50 +772,101 @@ class BootScene extends Phaser.Scene {
       g.destroy();
     }
 
-    // ── BOSS (bald, brown beard, black polo, khaki pants, boots)
+    // ── BOSS (bald, brown beard, black polo, khaki trousers, boots)
+    // 24x51 shown at 2x, which is the same on-screen box as the old 16x34 at 3x.
     {
-      const KHAKI = P.KHAKI;
-      const POLO  = P.INK; const POLO_D  = P.INK;
-      const BEARD = P.BROWN_2;
+      const KEY = {
+        '.': null, k: P.INK,
+        s: P.SKIN, S: P.SKIN_D, c: P.CREAM, w: P.WHITE,
+        B: P.BROWN_1, b: P.BROWN_2, l: P.BROWN_3,
+        p: P.GREY_1, h: P.GREY_2, H: P.GREY_3,
+        n: P.KHAKI, N: P.TAN_D, Y: P.YEL,
+      };
+      const rep = (ch, n) => ch.repeat(n);
+
+      // Bald head and beard, rows 0-21.
+      const HEAD = [
+        '.......kkkkkkkkkk.......',
+        '.....kkssssssssSSkk.....',
+        '....k' + 'sccssssssssSSS' + 'k....',
+        '...k' + 'ssccsssssssssSSS' + 'k...',
+        '..k' + 'ssscsssssssssssSSS' + 'k..',
+        '..k' + 'sssssssssssssssSSS' + 'k..',
+        '..k' + 'ssBBsssssssssBBsSS' + 'k..',
+        '..k' + 'sssBBBsssssBBBssSS' + 'k..',
+        '..k' + 'sssssBBsssBBssssSS' + 'k..',
+        '..k' + 'ssswkkwsssswkkwsSS' + 'k..',
+        '.kk' + 'ssswkkwsssswkkwsSS' + 'kk.',
+        'kSs' + 'sssssssSSSSsssssSS' + 'sSk',
+        'kSs' + 'bbssssSSSSSsssbbbB' + 'sSk',
+        'kSs' + 'bbbssSSkkkkSssbbbB' + 'sSk',
+        'kSs' + 'B' + rep('b', 15) + 'BB' + 'sSk',
+        '.kk' + 'Bbl' + rep('k', 9) + 'lbbbBB' + 'kk.',
+        '..k' + 'Bblk' + rep('b', 7) + 'kbbbbBB' + 'k..',
+        '..k' + 'll' + rep('b', 13) + 'BBB' + 'k..',
+        '...k' + 'l' + rep('b', 11) + 'BBBB' + 'k...',
+        '.....k' + 'l' + rep('b', 8) + 'BBB' + 'k.....',
+        '.......k' + 'l' + rep('b', 4) + 'BBB' + 'k.......',
+        '........k' + 'SssSSS' + 'k........',
+      ];
+
+      // Shoulders and short sleeves, rows 22-29. Polo: h highlight, p body, k shade.
+      const SHOULDERS = [
+        '..' + rep('k', 7) + 'SssSSS' + rep('k', 7) + '..',
+        '.k' + 'hhpppp' + rep('H', 8) + 'ppppkk' + 'k.',
+        'k' + 'hhppppp' + 'H' + 'pp' + 'kk' + 'pp' + 'H' + 'ppppp' + 'kk' + 'k',
+        'k' + 'hh' + rep('p', 8) + 'kk' + rep('p', 8) + 'kk' + 'k',
+        'k' + 'hhh' + 'k' + rep('p', 6) + 'Hk' + rep('p', 6) + 'k' + 'ppp' + 'k',
+        'k' + 'hhh' + 'k' + rep('p', 6) + 'kk' + rep('p', 6) + 'k' + 'ppp' + 'k',
+        'k' + 'hhh' + 'k' + rep('p', 6) + 'kk' + rep('p', 6) + 'k' + 'ppp' + 'k',
+        rep('k', 5) + 'hppppp' + 'kk' + 'pppp' + 'kk' + rep('k', 5),
+      ];
+
+      // Body strip, cols 5-18: polo 30-32, hem 33, belt 34.
+      const TORSO = [
+        'hppppp' + 'kk' + 'pppp' + 'kk',
+        'hppppp' + 'Hk' + 'pppp' + 'kk',
+        'hppppp' + 'kk' + 'pppp' + 'kk',
+        rep('k', 14),
+        'k' + rep('H', 5) + 'YY' + rep('H', 5) + 'k',
+      ];
+
+      // Legs, rows 35-50, 7 cols each. The planted sole is row 50; a lifted boot stops at 47.
+      const BOOT_ROWS = ['kHHhppk', 'kHhpppk', 'khppppk', 'kkkkkkk'];
+      const leg = (light, planted) => {
+        const thigh = light ? 'kcnnnNk' : 'knnnNNk';
+        const shin = light ? '.kcnnNk' : 'knnNNk.';
+        const cuff = light ? '.kkkkkk' : 'kkkkkk.';
+        return planted
+          ? [...Array(8).fill(thigh), shin, shin, shin, cuff, ...BOOT_ROWS]
+          : [...Array(8).fill(thigh), cuff, ...BOOT_ROWS, '.......', '.......', '.......'];
+      };
+
+      // Arms, rows 30-50, 5 cols. Down: fist by the thigh. Up: elbow bent, fist five rows higher.
+      const arm = (right, up) => {
+        const limb = right ? 'ksSSk' : 'kssSk';
+        const fist = ['ksssk', 'ksSSk'];
+        const on = up
+          ? [limb, limb, limb, ...fist, 'kkkkk']
+          : [...Array(7).fill(limb), ...fist, 'kkkkk'];
+        return [...on, ...Array(21 - on.length).fill('.....')];
+      };
+
+      // Opposite limbs swing together: left arm up with the right leg lifted.
+      const frame = (leftUp) => {
+        const L = arm(false, leftUp), R = arm(true, !leftUp);
+        const LL = leg(true, leftUp), LR = leg(false, !leftUp);
+        const mid = [...TORSO, ...LL.map((l, i) => l + LR[i])];
+        return [...HEAD, ...SHOULDERS, ...mid.map((m, i) => L[i] + m + R[i])];
+      };
+
       const g = this.make.graphics({ add: false });
-      // frame 0 — bald head (full skin top, no hat), brown beard
-      px(g, SKIN,   3,  0, 10, 13);
-      px(g, SKIN_D, 3, 12, 10,  1);
-      px(g, EYE,    5,  4,  2,  2);
-      px(g, EYE,    9,  4,  2,  2);
-      px(g, WHITE,  5,  4,  1,  1);
-      px(g, WHITE,  9,  4,  1,  1);
-      px(g, BEARD,  3,  8, 10,  5);
-      px(g, POLO,   3, 13, 10,  9);
-      px(g, POLO_D, 3, 13,  2,  9);
-      px(g, POLO_D,11, 13,  2,  9);
-      px(g, SKIN,   1, 14,  2,  7);
-      px(g, SKIN,  13, 14,  2,  7);
-      px(g, KHAKI,  4, 22,  4,  8);
-      px(g, KHAKI,  8, 19,  4,  8);
-      px(g, BOOT,   3, 29,  5,  3);
-      px(g, BOOT,   8, 26,  5,  3);
-      // frame 1
-      px(g, SKIN,  19,  0, 10, 13);
-      px(g, SKIN_D,19, 12, 10,  1);
-      px(g, EYE,   21,  4,  2,  2);
-      px(g, EYE,   25,  4,  2,  2);
-      px(g, WHITE, 21,  4,  1,  1);
-      px(g, WHITE, 25,  4,  1,  1);
-      px(g, BEARD, 19,  8, 10,  5);
-      px(g, POLO,  19, 13, 10,  9);
-      px(g, POLO_D,19, 13,  2,  9);
-      px(g, POLO_D,27, 13,  2,  9);
-      px(g, SKIN,  17, 14,  2,  7);
-      px(g, SKIN,  29, 14,  2,  7);
-      px(g, KHAKI, 20, 22,  4,  8);
-      px(g, KHAKI, 24, 19,  4,  8);
-      px(g, BOOT,  19, 29,  5,  3);
-      px(g, BOOT,  24, 26,  5,  3);
-      g.generateTexture('boss', 32, 34);
+      paintGrid(g, frame(true), KEY, 0);
+      paintGrid(g, frame(false), KEY, 24);
+      g.generateTexture('boss', 48, 51);
       g.destroy();
-      this.textures.get('boss').add(0, 0,  0, 0, 16, 34);
-      this.textures.get('boss').add(1, 0, 16, 0, 16, 34);
+      this.textures.get('boss').add(0, 0,  0, 0, 24, 51);
+      this.textures.get('boss').add(1, 0, 24, 0, 24, 51);
       this.anims.create({ key:'boss_walk',
         frames:[{key:'boss',frame:0},{key:'boss',frame:1}],
         frameRate:5, repeat:-1 });
@@ -1805,12 +1926,12 @@ class GameScene extends Phaser.Scene {
 
   spawnBoss() {
     const fromLeft   = Math.random() < 0.5;
-    const bossFloorY = C.HEIGHT - 64 - 51;  // scale 3: half-height = 17*3 = 51
+    const bossFloorY = C.HEIGHT - 64 - 51;  // 24x51 at scale 2: half-height = 25.5*2 = 51
     const spawnX     = fromLeft ? -30 : C.WIDTH + 30;
 
     this.boss = this.physics.add.sprite(spawnX, bossFloorY, 'boss');
     this.boss.play('boss_walk');
-    this.boss.setScale(3).setDepth(4);
+    this.boss.setScale(2).setDepth(4);
     this.boss.setCollideWorldBounds(false);
     this.boss.bossHP     = 3;
     this.boss.stunned    = false;
