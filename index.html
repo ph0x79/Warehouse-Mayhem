@@ -148,6 +148,7 @@ class BootScene extends Phaser.Scene {
     this.makePoopTextures();
     this.makeEnemyTextures();
     this.makeFanTextures();
+    this.makeUITextures();
     this.scene.start('Title');
   }
 
@@ -1064,71 +1065,204 @@ class BootScene extends Phaser.Scene {
     }
   }
 
+  makeUITextures() {
+    // ── JOYSTICK BASE (78x78, shown at 2x to match the old r=78 circle)
+    // A hollow ring so gameplay stays visible through the middle, with three arrows just
+    // inside the rim. Each arrow carries a 1px ink halo so it reads over pale floor and
+    // dark shelves alike. GameScene applies the see-through alpha to the whole image.
+    {
+      const KEY = { '.': null, k: P.INK, l: P.GREY_5, W: P.WHITE };
+      const S = 78, CEN = 38.5;
+      // Arrows: half-height grows a row every 2 columns, so the stair steps stay even.
+      const arrow = (x, y) => {
+        let d = x - 12;                                                    // left, tip at x=12
+        if (d >= 0 && d <= 9 && Math.abs(y - CEN) < Math.floor(d / 2) + 1) return true;
+        d = 65 - x;                                                        // right, tip at x=65
+        if (d >= 0 && d <= 9 && Math.abs(y - CEN) < Math.floor(d / 2) + 1) return true;
+        d = y - 12;                                                        // up, tip at y=12
+        if (d >= 0 && d <= 9 && Math.abs(x - CEN) < Math.floor(d / 2) + 1) return true;
+        return false;
+      };
+      const grid = [];
+      for (let y = 0; y < S; y++) {
+        const row = [];
+        for (let x = 0; x < S; x++) {
+          const d = Math.hypot(x - CEN, y - CEN);
+          let ch = '.';
+          if (d <= 38.6) {
+            if (d > 36.4) ch = 'k';        // outer edge
+            else if (d > 32.4) ch = 'W';   // band
+            else if (d > 30.4) ch = 'l';   // inner step
+            else if (d > 29.2) ch = 'k';   // inner edge
+          }
+          if (arrow(x, y)) ch = 'W';
+          row.push(ch);
+        }
+        grid.push(row);
+      }
+      // Ink halo: any empty pixel touching an arrow.
+      for (let y = 0; y < S; y++) {
+        for (let x = 0; x < S; x++) {
+          if (grid[y][x] !== '.') continue;
+          for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+            if (arrow(x + i, y + j)) { grid[y][x] = 'k'; i = j = 2; }
+          }
+        }
+      }
+      const g = this.make.graphics({ add: false });
+      paintGrid(g, grid.map(r => r.join('')), KEY);
+      g.generateTexture('joy_base', S, S);
+      g.destroy();
+    }
+
+    // ── JOYSTICK THUMB (26x26, shown at 2x) — filled dome, lit from the top-left like the fan hub
+    {
+      const KEY = { '.': null, k: P.INK, l: P.GREY_5, W: P.WHITE };
+      const S = 26, CEN = 12.5;
+      const rows = [];
+      for (let y = 0; y < S; y++) {
+        let row = '';
+        for (let x = 0; x < S; x++) {
+          const dx = x - CEN, dy = y - CEN;
+          const d = Math.hypot(dx, dy);
+          const lit = dx + dy < 1;
+          row +=
+            d > 12.6 ? '.' :
+            d > 11.1 ? 'k' :               // ink edge
+            d >  7.4 ? (lit ? 'W' : 'l')   // body, shaded bottom-right
+                     : 'W';                // centre cap
+        }
+        rows.push(row);
+      }
+      const g = this.make.graphics({ add: false });
+      paintGrid(g, rows, KEY);
+      g.generateTexture('joy_thumb', S, S);
+      g.destroy();
+    }
+  }
+
   makePlatformTextures() {
-    // ── SHELF PLATFORM (long metal shelf)
+    const patch = (row, col, s) => row.slice(0, col) + s + row.slice(col + s.length);
+
+    // ── SHELF PLATFORM (200x16) — rolled steel box beam seen flat-on. The sprite is placed
+    // with origin (0.5, 0) and feet land on row 4, so rows 0-4 are all top surface: one bright
+    // line then an unbroken lit lip, no crease until row 5. No ink on the steel anywhere:
+    // eight beams and six posts outlined in black would read as a cage.
     {
-      const W = 200, H = 16;
-      const g = this.make.graphics({ add: false });
-      // Top highlight
-      px(g, P.GREY_5, 0,  0, W,  3);
-      // Main shelf body
-      px(g, P.GREY_4, 0,  3, W,  8);
-      // Shelf shadow
-      px(g, P.GREY_2,  0, 11, W,  5);
-      // Rivets
-      for (let x = 12; x < W - 12; x += 40) {
-        px(g, P.GREY_5, x, 5, 3, 3);
+      const KEY = { '.': null, n: P.GREY_1, m: P.GREY_2, G: P.GREY_3, g: P.GREY_4, l: P.GREY_5 };
+      const band = c => c.repeat(200);
+      const bolts = (row, s) => {
+        let r = row;
+        for (let x = 18; x < 190; x += 40) r = patch(r, x, s);
+        return r;
+      };
+      const rows = [
+        band('l'),                 // 0  hard top edge, the standing line
+        band('g'),                 // 1  lit top lip
+        band('g'),                 // 2
+        band('g'),                 // 3
+        band('g'),                 // 4  feet land here
+        band('G'),                 // 5  crease under the lip
+        band('g'),                 // 6  web face
+        bolts(band('g'), 'll'),    // 7  bolt heads, lit top
+        bolts(band('g'), 'mm'),    // 8  bolt heads, shaded bottom
+        band('G'),                 // 9
+        band('G'),                 // 10
+        band('m'),                 // 11 bottom flange
+        band('m'),                 // 12
+        band('m'),                 // 13
+        band('n'),                 // 14 underside
+        band('n'),                 // 15
+      ];
+      // End caps: the beam overhangs each upright by 10px, so close the form without ink.
+      for (let y = 0; y < rows.length; y++) {
+        rows[y] = patch(rows[y], 0, y === 0 ? 'gg' : 'mm');
+        rows[y] = patch(rows[y], 198, y === 0 ? 'gg' : 'mm');
       }
-      g.generateTexture('shelf', W, H);
+      const g = this.make.graphics({ add: false });
+      paintGrid(g, rows, KEY);
+      g.generateTexture('shelf', 200, 16);
       g.destroy();
     }
 
-    // ── BOX (stackable crate) — native 18x18, displayed at 2x (36x36) to match the shelf art
+    // ── BOX (18x18, shown at 2x) — a discrete object, so unlike the steel it keeps an ink
+    // outline: lit top lip, shaded right side and underside, one motif only, the X brace.
     {
-      const S = 18;
-      const g = this.make.graphics({ add: false });
-      px(g, P.TAN,   0,  0, S,   S);
-      px(g, P.BROWN_3, 0,  0, S,   2);  // top shade
-      px(g, P.BROWN_2,  0, S-2, S,  2);  // bottom shadow
-      px(g, P.BROWN_2,  S-2, 0, 2,  S);  // right shadow
-      // X cross on box face
-      for (let i = 2; i < S - 2; i++) {
-        px(g, P.BROWN_2, i, i, 1, 1);
-        px(g, P.BROWN_2, S - 1 - i, i, 1, 1);
+      const KEY = { '.': null, k: P.INK, B: P.BROWN_1, b: P.BROWN_2, t: P.TAN_D, T: P.TAN };
+      const rows = [
+        'k'.repeat(18),                                        // 0  ink
+        'k' + 'T'.repeat(16) + 'k',                            // 1  lit top lip
+        'k' + 'T'.repeat(16) + 'k',                            // 2
+        ...Array(12).fill('k' + 't'.repeat(14) + 'bb' + 'k'),  // 3-14 face, right side shaded
+        'k' + 'b'.repeat(16) + 'k',                            // 15 underside shadow
+        'k' + 'b'.repeat(16) + 'k',                            // 16
+        'k'.repeat(18),                                        // 17 ink
+      ];
+      // X brace across the face, rows 3-14.
+      for (let i = 0; i < 12; i++) {
+        const c = 1 + Math.round((i * 15) / 11);
+        rows[3 + i] = patch(rows[3 + i], c, 'B');
+        rows[3 + i] = patch(rows[3 + i], 17 - c, 'B');
       }
-      g.generateTexture('box', S, S);
+      const g = this.make.graphics({ add: false });
+      paintGrid(g, rows, KEY);
+      g.generateTexture('box', 18, 18);
       g.destroy();
     }
 
-    // ── PALLET
+    // ── PALLET (80x14) — side-on, stacked two high on the floor. Row 0 is the standing line,
+    // so the top board stays flat and unbroken; three feet with open air between them.
     {
-      const W = 80, H = 14;
-      const g = this.make.graphics({ add: false });
-      // Boards
-      for (let x = 0; x < W; x += 16) {
-        px(g, P.TAN_D,   x,  0, 14,  H);
-        px(g, P.BROWN_2, x + 12, 0,  2, H);
+      const KEY = { '.': null, B: P.BROWN_1, b: P.BROWN_2, t: P.TAN_D, T: P.TAN };
+      const band = c => c.repeat(80);
+      const BLOCKS = [0, 34, 68];            // 12-wide feet
+      const BLOCK = 'Tttttttttbbb';          // lit left edge, shaded right
+      const blockRow = (fill) => {
+        let r = band('.');
+        for (const x of BLOCKS) r = patch(r, x, fill);
+        return r;
+      };
+      const rows = [
+        band('T'),                           // 0  top board, the standing line
+        band('t'),                           // 1
+        band('t'),                           // 2
+        band('b'),                           // 3  under-edge of the top deck
+        blockRow('B'.repeat(12)),            // 4  shadow on top of each foot
+        blockRow(BLOCK),                     // 5
+        blockRow(BLOCK),                     // 6
+        blockRow(BLOCK),                     // 7
+        blockRow(BLOCK),                     // 8
+        blockRow('b'.repeat(12)),            // 9
+        band('t'),                           // 10 bottom deck
+        band('t'),                           // 11
+        band('b'),                           // 12
+        band('B'),                           // 13 ground shadow
+      ];
+      // Board seams: 1px gaps between planks, kept off the flat top row.
+      for (const x of [15, 31, 47, 63]) {
+        for (const y of [1, 2, 10, 11]) rows[y] = patch(rows[y], x, 'B');
       }
-      // Top slats
-      px(g, P.TAN_D,   0, 0, W, 3);
-      px(g, P.TAN_D,   0, 6, W, 3);
-      px(g, P.BROWN_2, 0, H-2, W, 2);
-      g.generateTexture('pallet', W, H);
+      const g = this.make.graphics({ add: false });
+      paintGrid(g, rows, KEY);
+      g.generateTexture('pallet', 80, 14);
       g.destroy();
     }
 
-    // ── SHELF UPRIGHT (vertical support)
+    // ── SHELF UPRIGHT (12x200) — punched rack post, lit from the left. Drawn as a TileSprite
+    // stretched to any height, so every row is a pure function of y % 20. 20 divides 200, so
+    // row 199 flows into row 0 with no seam. The highlight stops at GREY_4 on purpose: six of
+    // these stand on screen at once and a bright stripe down each one reads as a cage.
     {
-      const W = 12, H = 200;
+      const KEY = { '.': null, n: P.GREY_1, m: P.GREY_2, G: P.GREY_3, g: P.GREY_4 };
+      const POST = 'mGggggGGGmmn';           // dark edge, lit face, shaded face, dark edge
+      const SLOT = { 8: 'nnnn', 9: 'mmmm', 10: 'mmmm' };   // one punched slot per 20 rows
+      const rows = Array.from({ length: 200 }, (_, y) => {
+        const s = SLOT[y % 20];
+        return s ? patch(POST, 4, s) : POST;
+      });
       const g = this.make.graphics({ add: false });
-      px(g, P.GREY_4, 0, 0, W, H);
-      px(g, P.GREY_5, 1, 0, 3, H);
-      px(g, P.GREY_2,  W-3, 0, 3, H);
-      // Bolt holes
-      for (let y = 16; y < H; y += 32) {
-        px(g, P.GREY_2, 4, y, 4, 4);
-      }
-      g.generateTexture('shelf_upright', W, H);
+      paintGrid(g, rows, KEY);
+      g.generateTexture('shelf_upright', 12, 200);
       g.destroy();
     }
   }
@@ -1816,27 +1950,12 @@ class GameScene extends Phaser.Scene {
 
     this.joystickZone = { x: CX, y: CY, r: R };
 
-    // Outer ring
-    const gfx = this.add.graphics().setDepth(50).setScrollFactor(0);
-    gfx.fillStyle(0xFFFFFF, 0.12);
-    gfx.fillCircle(CX, CY, R);
-    gfx.lineStyle(2, 0xFFFFFF, 0.35);
-    gfx.strokeCircle(CX, CY, R);
-
-    // Arrow hints
-    const hintStyle = { fontSize: '14px', color: '#ffffff' };
-    this.add.text(CX - R + 10, CY,      '◀', hintStyle).setOrigin(0.5).setDepth(51).setScrollFactor(0);
-    this.add.text(CX + R - 10, CY,      '▶', hintStyle).setOrigin(0.5).setDepth(51).setScrollFactor(0);
-    this.add.text(CX,          CY - R + 10, '▲', hintStyle).setOrigin(0.5).setDepth(51).setScrollFactor(0);
+    // Ring and arrow hints are one pixel texture, drawn at 2x like every other sprite.
+    this.add.image(CX, CY, 'joy_base').setScale(2).setAlpha(0.4).setDepth(50).setScrollFactor(0);
 
     // Movable thumb
-    const thumbGfx = this.add.graphics().setDepth(52).setScrollFactor(0);
-    const drawThumb = (tx, ty) => {
-      thumbGfx.clear();
-      thumbGfx.fillStyle(0xFFFFFF, 0.35);
-      thumbGfx.fillCircle(tx, ty, 26);
-    };
-    drawThumb(CX, CY);
+    const thumb = this.add.image(CX, CY, 'joy_thumb').setScale(2).setAlpha(0.5).setDepth(52).setScrollFactor(0);
+    const drawThumb = (tx, ty) => thumb.setPosition(tx, ty);
 
     // Update flags and thumb from pointer position
     const update = (ptr) => {
