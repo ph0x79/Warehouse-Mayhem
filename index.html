@@ -534,9 +534,11 @@ class BootScene extends Phaser.Scene {
     const pad = (rows, n) => rows.map(r => '.'.repeat(n) + r + '.'.repeat(n));
     const EMPTY = '.'.repeat(16);
 
-    // Rows 5-13. Big cartoon head to match the chimp, lit from the top-left.
+    // Rows 5-13. Big cartoon head to match the chimp, lit from the top-left. The forehead sits in
+    // shade because every role now wears a brimmed hat, and that shadow is what makes the brim
+    // read as projecting rather than painted on.
     const FACE = [
-      '.kssssssssssSSk.',
+      '.kSSSSSSSSSSSSk.',
       '.kssssssssssSSk.',
       '.ksswksssswkSSk.',
       '.ksswksssswkSSk.',
@@ -547,27 +549,24 @@ class BootScene extends Phaser.Scene {
       '...kkSSSSSSkk...',
     ];
 
-    // Rows 0-4: hard hat, peaked cap and bare hair, one per role for distinct silhouettes.
+    // Rows 0-4: hard hat and peaked cap. Four shades rather than flat bands, which is what the
+    // old hats lacked: i is the moulded centre rib, h the lit crown, H its shaded right side, and
+    // j the brim underside. The crown sits narrower than the brim so the brim reads as sticking
+    // out past the head, and FACE puts the forehead in its shadow.
     const HARD_HAT = [
       '.....kkkkkk.....',
-      '....khhhhhHk....',
-      '...khhhhhhhHk...',
-      '.kkHHHHHHHHHHkk.',
+      '....khhiihHk....',
+      '...khhhiihHHk...',
+      '.kkhhhhhhhhhHkk.',
       '.kjjjjjjjjjjjjk.',
     ];
+    // Security cap: soft crown, longer peak, and a white flash where the SECURITY text sits.
     const CAP = [
       '.....kkkkkk.....',
       '....khhhhhHk....',
-      '...khhhhhhhHk...',
+      '...khwwwwwhHk...',
       '.kkHHHHHHHHHHkk.',
       '.kjjjjjjjjjjjjjk',
-    ];
-    const HAIR = [
-      '.....kkkkkk.....',
-      '....khhhhhHk....',
-      '...khhhhhhhHk...',
-      '.kkhhhhhhhHHHkk.',
-      '.kHHHHHHHHHHHHk.',
     ];
 
     // Torso rows 14-23. Columns: 0 ink | 1-2 arm | 3 ink | 4-11 torso | 12 ink | 13-14 arm | 15 ink.
@@ -580,15 +579,23 @@ class BootScene extends Phaser.Scene {
       short ? (y <= 17 ? 'slv' : y <= 20 ? 'hand' : y === 21 ? 'cap' : 'off')
             : (y <= 19 ? 'slv' : y <= 22 ? 'hand' : 'cap');
 
+    // What the middle 8 columns of the torso show on each row. Roles swap this to wear something
+    // other than a plain shirt; the arms and the silhouette are unaffected.
+    const PLAIN    = y => (y === 23 ? BELT_ROW : SHIRT_ROW);
+    // Bib overalls: denim straps over the shirt at the shoulders, denim bib from the chest down.
+    const OVERALLS = y => (y === 23 ? BELT_ROW : y <= 16 ? 'cqvvvvqV' : 'qppppppP');
+    // Collar and tie, for the ones who wear one. t/T are the tie.
+    const TIE      = y => (y === 23 ? BELT_ROW : y === 15 ? 'cvwTtwVV' : y <= 18 ? 'cvvTtvVV' : SHIRT_ROW);
+
     // `hi` is the side whose arm is raised.
-    const torso = (hi) => {
+    const torso = (hi, body = PLAIN) => {
       const L = hi === 'L';
       const rows = ['k'.repeat(16)];
       for (let y = 15; y <= 23; y++) {
         const ls = armState(L, y), rs = armState(!L, y);
         const lp = ls === 'off' ? '...k' : ls === 'cap' ? 'kkkk' : 'k' + (ls === 'slv' ? SLV_L : HAND) + 'k';
         const rp = rs === 'off' ? 'k...' : rs === 'cap' ? 'kkkk' : 'k' + (rs === 'slv' ? SLV_R : HAND) + 'k';
-        rows.push(lp + (y === 23 ? BELT_ROW : SHIRT_ROW) + rp);
+        rows.push(lp + body(y) + rp);
       }
       return rows;
     };
@@ -606,30 +613,69 @@ class BootScene extends Phaser.Scene {
     };
 
     // Contralateral gait: the raised arm goes with the opposite raised leg.
-    const build = (hat, hi) => [
-      ...hat, ...FACE, ...torso(hi), ...legs(hi === 'L' ? 'R' : 'L'), EMPTY, EMPTY,
+    const build = (hat, hi, body) => [
+      ...hat, ...FACE, ...torso(hi, body), ...legs(hi === 'L' ? 'R' : 'L'), EMPTY, EMPTY,
     ];
 
-    // ── WAREHOUSE WORKER (grey hard hat, blue shirt) — the plain one, no props
-    {
-      const KEY = {
-        '.': null, k: P.INK,
-        s: P.SKIN, S: P.SKIN_D, w: P.WHITE,
-        h: P.GREY_5, H: P.GREY_4, j: P.GREY_3,   // hard hat
-        c: P.SKY, v: P.BLUE, V: P.BLUE_D,        // shirt
-        q: P.GREY_4, p: P.GREY_3, P: P.GREY_2,   // trousers and belt
-        b: P.GREY_2, B: P.GREY_1,                // boots
-      };
+    // A ponytail through the back of the hat. Applied after build, on the head rows, so it works
+    // with any hat and costs no extra grid. 'a' is the hair.
+    const ponytail = rows => rows.map((r, y) =>
+      y === 4 ? patch(r, 14, 'k')  :   // gathered under the back of the brim
+      y >= 5 && y <= 7 ? patch(r, 14, 'aa') :
+      y === 8 ? patch(r, 14, 'ak') :
+      y === 9 ? patch(r, 14, 'k')  : r);
+
+    // Wraparound shades, for the guard. Replaces the eye rows outright: at 16px wide a lens is
+    // the same size as an eye, so drawing both just muddies the face.
+    const shades = rows => rows.map((r, y) =>
+      y === 7 ? '.kkkkwkkkwkkSSk.' :
+      y === 8 ? '.kkkkkkkkkkkSSk.' : r);
+
+    // ── WAREHOUSE WORKERS — the plain random-walkers, no props. Three people off the warehouse
+    // floor rather than one repeated body: a man in bib overalls, a woman in coveralls, and a man
+    // in a button-down and khakis. All in orange hard hats, as everyone in the reference shots is.
+    // Same silhouette and the same random walk, so the outfit never misleads about behaviour.
+    const HAT_ORANGE = { h: P.ORANGE_L, i: P.CREAM, H: P.ORANGE, j: P.ORANGE_D };
+    const HAT_WHITE  = { h: P.WHITE,    i: P.WHITE, H: P.GREY_6, j: P.GREY_4  };
+    const SKIN_PALE  = { s: P.SKIN,     S: P.SKIN_D };
+    const SKIN_DEEP  = { s: P.BROWN_3,  S: P.BROWN_2 };
+    const BOOTS      = { b: P.BROWN_1,  B: P.BROWN_0 };
+    const BASE       = { '.': null, k: P.INK, w: P.WHITE };
+
+    const WORKERS = [
+      { // bib overalls over a tan work shirt
+        key: 'worker', body: OVERALLS,
+        KEY: { ...BASE, ...HAT_ORANGE, ...SKIN_PALE, ...BOOTS,
+               c: P.TAN, v: P.TAN_D, V: P.BROWN_2,        // shirt under the bib
+               q: P.BLUE, p: P.BLUE_D, P: P.NAVY },       // denim bib and trousers
+      },
+      { // one-piece coveralls, ponytail through the back of the hat
+        key: 'worker_b', body: PLAIN, hair: P.BROWN_1,
+        KEY: { ...BASE, ...HAT_ORANGE, ...SKIN_PALE, ...BOOTS,
+               c: P.SKY, v: P.BLUE, V: P.BLUE_D,          // coveralls, top and bottom alike
+               q: P.BLUE, p: P.BLUE_D, P: P.NAVY },
+      },
+      { // button-down and khakis
+        key: 'worker_c', body: PLAIN,
+        KEY: { ...BASE, ...HAT_WHITE, ...SKIN_DEEP, ...BOOTS,
+               c: P.WHITE, v: P.GREY_6, V: P.GREY_5,      // button-down
+               q: P.KHAKI, p: P.TAN_D, P: P.BROWN_2 },    // khakis
+      },
+    ];
+
+    for (const o of WORKERS) {
+      const KEY = o.hair ? { ...o.KEY, a: o.hair } : o.KEY;
+      const dress = rows => (o.hair ? ponytail(rows) : rows);
       const g = this.make.graphics({ add: false });
-      paintGrid(g, build(HARD_HAT, 'L'), KEY, 0);
-      paintGrid(g, build(HARD_HAT, 'R'), KEY, 16);
-      g.generateTexture('worker', 32, 34);
+      paintGrid(g, dress(build(HARD_HAT, 'L', o.body)), KEY, 0);
+      paintGrid(g, dress(build(HARD_HAT, 'R', o.body)), KEY, 16);
+      g.generateTexture(o.key, 32, 34);
       g.destroy();
-      this.textures.get('worker').add(0, 0,  0, 0, 16, 34);
-      this.textures.get('worker').add(1, 0, 16, 0, 16, 34);
-      this.anims.create({ key:'worker_walk',
-        frames:[{key:'worker',frame:0},{key:'worker',frame:1}],
-        frameRate:6, repeat:-1 });
+      this.textures.get(o.key).add(0, 0,  0, 0, 16, 34);
+      this.textures.get(o.key).add(1, 0, 16, 0, 16, 34);
+      this.anims.create({ key: o.key + '_walk',
+        frames: [{ key: o.key, frame: 0 }, { key: o.key, frame: 1 }],
+        frameRate: 6, repeat: -1 });
     }
 
     // ── WORKER WITH FAN BLADE (white hat, orange hi-vis, blade carried at waist height)
@@ -637,12 +683,12 @@ class BootScene extends Phaser.Scene {
     {
       const KEY = {
         '.': null, k: P.INK,
-        s: P.SKIN, S: P.SKIN_D,
-        h: P.WHITE, H: P.GREY_6, j: P.GREY_4,        // white hard hat
+        ...SKIN_PALE,
+        ...HAT_WHITE,                                // white hard hat
         c: P.ORANGE_L, v: P.ORANGE, V: P.ORANGE_D,   // hi-vis vest
         w: P.WHITE, g: P.GREY_5,                     // reflective band
         q: P.GREY_3, p: P.GREY_2, P: P.GREY_1,       // trousers and belt
-        b: P.GREY_2, B: P.GREY_1,                    // boots
+        ...BOOTS,
         l: P.GREY_6, L: P.GREY_4,                    // fan blade
       };
       const frame = (hi) => {
@@ -669,20 +715,22 @@ class BootScene extends Phaser.Scene {
         frameRate:5, repeat:-1 });
     }
 
-    // ── SECURITY GUARD (peaked cap, near-black uniform, yellow badge, pistol in the low hand)
+    // ── SECURITY GUARD (peaked cap with its white flash, shades, black uniform over a white
+    // shirt and tie, yellow badge, pistol in the low hand)
     {
       const KEY = {
         '.': null, k: P.INK,
-        s: P.SKIN, S: P.SKIN_D, w: P.WHITE,
-        h: P.GREY_3, H: P.GREY_2, j: P.GREY_1,   // cap
-        c: P.GREY_3, v: P.GREY_2, V: P.GREY_1,   // uniform shirt
+        ...SKIN_DEEP, w: P.WHITE,
+        h: P.GREY_2, i: P.GREY_3, H: P.GREY_1, j: P.INK,   // cap
+        c: P.GREY_3, v: P.GREY_2, V: P.GREY_1,   // uniform jacket
+        t: P.GREY_1, T: P.INK,                   // tie under the open jacket
         q: P.GREY_3, p: P.GREY_2, P: P.GREY_1,   // trousers and belt
         b: P.GREY_2, B: P.GREY_1,                // boots
         y: P.YEL,                                // badge
         G: P.GREY_5,                             // pistol, light so it reads on the dark uniform
       };
       const frame = (hi) => {
-        const rows = build(CAP, hi);
+        const rows = shades(build(CAP, hi, TIE));
         rows[17] = patch(rows[17], 5, 'yy');     // badge on the chest
         rows[18] = patch(rows[18], 5, 'yy');
         const y = hi === 'L' ? 23 : 21;          // pistol hangs off whichever hand is low
@@ -702,20 +750,22 @@ class BootScene extends Phaser.Scene {
         frameRate:7, repeat:-1 });
     }
 
-    // ── MANAGER (bare head, white shirt, red tie, clipboard held to the chest)
+    // ── MANAGER (white hard hat, button-down, red tie, khakis, clipboard held to the chest).
+    // He wears a hat now because everyone on a warehouse floor does, including the man in the
+    // button-down in the reference shots.
     {
       const KEY = {
         '.': null, k: P.INK,
-        s: P.SKIN, S: P.SKIN_D,
-        h: P.BROWN_2, H: P.BROWN_1, j: P.BROWN_0,   // hair
+        ...SKIN_PALE,
+        ...HAT_WHITE,
         c: P.WHITE, v: P.GREY_6, V: P.GREY_5,       // shirt
         R: P.RED_L, r: P.RED,                       // tie
-        q: P.GREY_3, p: P.GREY_2, P: P.GREY_1,      // trousers and belt
-        b: P.GREY_2, B: P.GREY_1,                   // boots
+        q: P.KHAKI, p: P.TAN_D, P: P.BROWN_2,       // khakis and belt
+        b: P.BROWN_1, B: P.BROWN_0,                 // boots
         T: P.TAN_D, w: P.WHITE, G: P.GREY_4,        // clipboard
       };
       const frame = (hi) => {
-        const rows = build(HAIR, hi);
+        const rows = build(HARD_HAT, hi);
         rows[15] = patch(rows[15], 6, 'VRrV');      // collar notch, then the tie
         for (let y = 16; y <= 21; y++) rows[y] = patch(rows[y], 7, 'Rr');
         // Clipboard bobs 1px between frames; the tan frame keeps the paper off the white shirt.
@@ -970,20 +1020,25 @@ class BootScene extends Phaser.Scene {
         frameRate:5, repeat:-1 });
     }
 
-    // ── KEYBOARD — thrown by the boss: dark body, two rows of keys, spacebar below
+    // ── KEYBOARD (18x9) — thrown by the boss. A full-size board off the reference: black case,
+    // grey caps, the one gold esc key top left, and the numpad block set off by a gap at the
+    // right. The gold key is what makes it read as a keyboard rather than a grey brick.
     {
-      const KEY = { '.': null, k: P.INK, b: P.GREY_2, w: P.GREY_6, W: P.GREY_4 };
+      const KEY = { '.': null, k: P.INK, n: P.GREY_1, b: P.GREY_2, w: P.GREY_6, W: P.GREY_4,
+                    y: P.YEL, d: P.YEL_D };
       const g = this.make.graphics({ add: false });
       paintGrid(g, [
-        'kkkkkkkkkkkkkk',
-        'kwwbwwbwwbwwbk',
-        'kWWbWWbWWbWWbk',
-        'kbbbbbbbbbbbbk',
-        'kwwbwwwwwwbwwk',
-        'kWWbWWWWWWbWWk',
-        'kkkkkkkkkkkkkk',
+        'kkkkkkkkkkkkkkkkkk',
+        'kynwbwbwbwbwnkwbwk',   // function row: gold esc, then F-keys, numpad corner
+        'kdnWbWbWbWbWnkWbWk',
+        'knnnnnnnnnnnnknnnk',
+        'kwbwbwbwbwbwbkwbwk',   // letter rows
+        'kWbWbWbWbWbWbkWbWk',
+        'kwbwbwbwbwbwbkwbwk',
+        'knnwwwwwwwwnnknWnk',   // spacebar, then the numpad enter
+        'kkkkkkkkkkkkkkkkkk',
       ], KEY);
-      g.generateTexture('keyboard', 14, 7);
+      g.generateTexture('keyboard', 18, 9);
       g.destroy();
     }
 
@@ -1636,14 +1691,18 @@ class GameScene extends Phaser.Scene {
     let enemy;
 
     switch (type) {
-      case 'worker':
-        enemy = this.enemies.create(spawnX, floorY, 'worker');
-        enemy.play('worker_walk');
+      case 'worker': {
+        // Three people wear this role. Same points, same walk — only the outfit differs, so the
+        // pick can be random without ever misleading the player about what the enemy will do.
+        const who = Phaser.Utils.Array.GetRandom(['worker', 'worker_b', 'worker_c']);
+        enemy = this.enemies.create(spawnX, floorY, who);
+        enemy.play(who + '_walk');
         enemy.points     = 100;
         enemy.speed      = Phaser.Math.Between(55, 90);
         enemy.enemyType  = 'worker';
         enemy.randomWalk = true;   // walks straight across, no pursuit
         break;
+      }
 
       case 'blade':
         enemy = this.enemies.create(spawnX, floorY, 'worker_blade');

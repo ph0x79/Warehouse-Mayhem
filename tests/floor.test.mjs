@@ -53,8 +53,18 @@ try {
     }
   }
 
+  // The worker role picks one of three outfits at random, so the spawn above only checks whichever
+  // one came up. They have to stay the same size as each other or floor placement turns flaky.
+  const variants = await page.evaluate(() => ['worker', 'worker_b', 'worker_c'].map(k => {
+    const f = window.__game.textures.get(k).get(0);
+    return [k, f.width, f.height];
+  }));
+  for (const [k, w, h] of variants) {
+    assert.deepEqual([w, h], [16, 34], `${k} frame is not 16x34`);
+  }
+
   assert.deepEqual(errors, [], 'page errors');
-  console.log(`PASS floor: ${rows.length} sprites at y=${floorTop}, sizes match baseline`);
+  console.log(`PASS floor: ${rows.length} sprites at y=${floorTop}, sizes match baseline, ${variants.length} worker outfits`);
 } finally {
   await browser.close();
 }
