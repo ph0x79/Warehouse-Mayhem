@@ -86,6 +86,7 @@ const C = {
   POOP_SPEED:      520,
   SPAWN_RATE_BASE: 3000,   // ms between enemy spawns (decreases over time)
   FAN_THRESHOLD:   1000,   // score points to charge the fan
+  FAN_WIND:        0.75,   // projectile speed multiplier while the fan is spinning
 
   // One shared palette for every texture, each ramp dark to light. INK doubles as the outline colour.
   PAL: {
@@ -1482,6 +1483,10 @@ class GameScene extends Phaser.Scene {
   // Lob a sprite from (ox,oy) toward (tx,ty) on a gravity-compensated arc.
   // opts: flip = face travel direction, ttl = auto-destroy ms, splat = splat on world bounds.
   lob(group, tex, ox, oy, tx, ty, spd, opts = {}) {
+    // The fan's downdraft drags on everything thrown under it. Scaling spd rather than the solved
+    // velocity is what keeps the shot honest: with t = dist/spd, the gravity term below cancels to
+    // y(t) = oy + dy for any spd, so a slower throw still lands on the target, just loftier.
+    spd *= this.fanWind;
     const s    = group.create(ox, oy, tex);
     const dx   = tx - ox, dy = ty - oy;
     const dist = Math.sqrt(dx*dx + dy*dy);
@@ -1803,6 +1808,7 @@ class GameScene extends Phaser.Scene {
     this.fanSpinning   = false;
     this.fanSpeed      = 0;
     this.fanCharge        = 0;   // points banked toward the next spin, see addScore()
+    this.fanWind          = 1;   // projectile speed multiplier, see lob()
     this.fanTriggered     = false;
     this.fanLockoutUntil  = 0;   // epoch ms — score doesn't count toward fan during lockout
 
@@ -1848,6 +1854,7 @@ class GameScene extends Phaser.Scene {
           this.fanSpinning   = false;
           this.fanTriggered  = false;
           this.fanCharge     = 0;
+          this.fanWind       = 1;
         }
       }
     }
@@ -1874,6 +1881,8 @@ class GameScene extends Phaser.Scene {
     this.fanSpinning  = true;
     this.fanTriggered = false;
     this.fanSpeed     = 0;
+    this.fanWind      = C.FAN_WIND;   // applied at spawn only; rescaling bodies in flight would
+                                      // break the arcs they were already solved for
     SFX.fanRevUp();
     this.tweens.addCounter({
       from: 0, to: 14, duration: 1200,
