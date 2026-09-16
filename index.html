@@ -1753,6 +1753,9 @@ class GameScene extends Phaser.Scene {
   addScore(pts, x, y) {
     this.score += pts;
     this.scoreTxt.setText('SCORE: ' + this.score);
+    // The fan only charges on points earned while it is idle and out of cooldown. Every scoring
+    // path routes through here, including the nuke's own kills, so this is the one place to gate.
+    if (!this.fanSpinning && this.time.now >= this.fanLockoutUntil) this.fanCharge += pts;
     if (this.score >= 10000 && !this.bossSpawned) {
       this.bossSpawned = true;
       this.spawnBoss();
@@ -1799,7 +1802,7 @@ class GameScene extends Phaser.Scene {
     this.fanCY         = cy;
     this.fanSpinning   = false;
     this.fanSpeed      = 0;
-    this.fanNextThresh    = C.FAN_THRESHOLD;
+    this.fanCharge        = 0;   // points banked toward the next spin, see addScore()
     this.fanTriggered     = false;
     this.fanLockoutUntil  = 0;   // epoch ms — score doesn't count toward fan during lockout
 
@@ -1810,7 +1813,7 @@ class GameScene extends Phaser.Scene {
   updateFan() {
     // Spin up if threshold crossed and not in post-nuke lockout
     const now = this.time.now;
-    if (!this.fanSpinning && this.score >= this.fanNextThresh && now >= this.fanLockoutUntil) {
+    if (!this.fanSpinning && this.fanCharge >= C.FAN_THRESHOLD && now >= this.fanLockoutUntil) {
       this.startFanSpin();
     }
 
@@ -1844,14 +1847,13 @@ class GameScene extends Phaser.Scene {
           this.fanSpeed      = 0;
           this.fanSpinning   = false;
           this.fanTriggered  = false;
-          this.fanNextThresh += C.FAN_THRESHOLD;
+          this.fanCharge     = 0;
         }
       }
     }
 
     // Update HUD charge bar
-    const prev     = this.fanNextThresh - C.FAN_THRESHOLD;
-    const frac     = this.fanSpinning ? 1 : Math.min((this.score - prev) / C.FAN_THRESHOLD, 1);
+    const frac     = this.fanSpinning ? 1 : Math.min(this.fanCharge / C.FAN_THRESHOLD, 1);
     const isLocked = !this.fanSpinning && this.time.now < this.fanLockoutUntil;
     const secsLeft = Math.ceil((this.fanLockoutUntil - this.time.now) / 1000);
     const pct      = Math.min(Math.floor(frac * 100), 100);
@@ -1911,11 +1913,10 @@ class GameScene extends Phaser.Scene {
   }
 
   nukeAllEnemies() {
-    // Award points for all enemies, but lock fan charge for 10s
+    // Award points for all enemies, but lock fan charge for 10s. The lockout is set before the
+    // kills are scored, so addScore() turns the nuke's own points away too.
     const LOCKOUT_MS = 10000;
     this.fanLockoutUntil = this.time.now + LOCKOUT_MS;
-    // Advance threshold so score gained during lockout doesn't immediately re-trigger
-    this.fanNextThresh = this.score + C.FAN_THRESHOLD;
     this.enemies.getChildren().slice().forEach(enemy => {
       if (!enemy.active) return;
       this.addScore(enemy.points || 100, enemy.x, enemy.y - 20);
