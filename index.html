@@ -148,6 +148,7 @@ class BootScene extends Phaser.Scene {
     this.makePoopTextures();
     this.makeEnemyTextures();
     this.makeFanTextures();
+    this.makeUITextures();
     this.scene.start('Title');
   }
 
@@ -1064,6 +1065,82 @@ class BootScene extends Phaser.Scene {
     }
   }
 
+  makeUITextures() {
+    // ── JOYSTICK BASE (78x78, shown at 2x to match the old r=78 circle)
+    // A hollow ring so gameplay stays visible through the middle, with three arrows just
+    // inside the rim. Each arrow carries a 1px ink halo so it reads over pale floor and
+    // dark shelves alike. GameScene applies the see-through alpha to the whole image.
+    {
+      const KEY = { '.': null, k: P.INK, l: P.GREY_5, W: P.WHITE };
+      const S = 78, CEN = 38.5;
+      // Arrows: half-height grows a row every 2 columns, so the stair steps stay even.
+      const arrow = (x, y) => {
+        let d = x - 12;                                                    // left, tip at x=12
+        if (d >= 0 && d <= 9 && Math.abs(y - CEN) < Math.floor(d / 2) + 1) return true;
+        d = 65 - x;                                                        // right, tip at x=65
+        if (d >= 0 && d <= 9 && Math.abs(y - CEN) < Math.floor(d / 2) + 1) return true;
+        d = y - 12;                                                        // up, tip at y=12
+        if (d >= 0 && d <= 9 && Math.abs(x - CEN) < Math.floor(d / 2) + 1) return true;
+        return false;
+      };
+      const grid = [];
+      for (let y = 0; y < S; y++) {
+        const row = [];
+        for (let x = 0; x < S; x++) {
+          const d = Math.hypot(x - CEN, y - CEN);
+          let ch = '.';
+          if (d <= 38.6) {
+            if (d > 36.4) ch = 'k';        // outer edge
+            else if (d > 32.4) ch = 'W';   // band
+            else if (d > 30.4) ch = 'l';   // inner step
+            else if (d > 29.2) ch = 'k';   // inner edge
+          }
+          if (arrow(x, y)) ch = 'W';
+          row.push(ch);
+        }
+        grid.push(row);
+      }
+      // Ink halo: any empty pixel touching an arrow.
+      for (let y = 0; y < S; y++) {
+        for (let x = 0; x < S; x++) {
+          if (grid[y][x] !== '.') continue;
+          for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+            if (arrow(x + i, y + j)) { grid[y][x] = 'k'; i = j = 2; }
+          }
+        }
+      }
+      const g = this.make.graphics({ add: false });
+      paintGrid(g, grid.map(r => r.join('')), KEY);
+      g.generateTexture('joy_base', S, S);
+      g.destroy();
+    }
+
+    // ── JOYSTICK THUMB (26x26, shown at 2x) — filled dome, lit from the top-left like the fan hub
+    {
+      const KEY = { '.': null, k: P.INK, l: P.GREY_5, W: P.WHITE };
+      const S = 26, CEN = 12.5;
+      const rows = [];
+      for (let y = 0; y < S; y++) {
+        let row = '';
+        for (let x = 0; x < S; x++) {
+          const dx = x - CEN, dy = y - CEN;
+          const d = Math.hypot(dx, dy);
+          const lit = dx + dy < 1;
+          row +=
+            d > 12.6 ? '.' :
+            d > 11.1 ? 'k' :               // ink edge
+            d >  7.4 ? (lit ? 'W' : 'l')   // body, shaded bottom-right
+                     : 'W';                // centre cap
+        }
+        rows.push(row);
+      }
+      const g = this.make.graphics({ add: false });
+      paintGrid(g, rows, KEY);
+      g.generateTexture('joy_thumb', S, S);
+      g.destroy();
+    }
+  }
+
   makePlatformTextures() {
     // ── SHELF PLATFORM (long metal shelf)
     {
@@ -1816,27 +1893,12 @@ class GameScene extends Phaser.Scene {
 
     this.joystickZone = { x: CX, y: CY, r: R };
 
-    // Outer ring
-    const gfx = this.add.graphics().setDepth(50).setScrollFactor(0);
-    gfx.fillStyle(0xFFFFFF, 0.12);
-    gfx.fillCircle(CX, CY, R);
-    gfx.lineStyle(2, 0xFFFFFF, 0.35);
-    gfx.strokeCircle(CX, CY, R);
-
-    // Arrow hints
-    const hintStyle = { fontSize: '14px', color: '#ffffff' };
-    this.add.text(CX - R + 10, CY,      '◀', hintStyle).setOrigin(0.5).setDepth(51).setScrollFactor(0);
-    this.add.text(CX + R - 10, CY,      '▶', hintStyle).setOrigin(0.5).setDepth(51).setScrollFactor(0);
-    this.add.text(CX,          CY - R + 10, '▲', hintStyle).setOrigin(0.5).setDepth(51).setScrollFactor(0);
+    // Ring and arrow hints are one pixel texture, drawn at 2x like every other sprite.
+    this.add.image(CX, CY, 'joy_base').setScale(2).setAlpha(0.4).setDepth(50).setScrollFactor(0);
 
     // Movable thumb
-    const thumbGfx = this.add.graphics().setDepth(52).setScrollFactor(0);
-    const drawThumb = (tx, ty) => {
-      thumbGfx.clear();
-      thumbGfx.fillStyle(0xFFFFFF, 0.35);
-      thumbGfx.fillCircle(tx, ty, 26);
-    };
-    drawThumb(CX, CY);
+    const thumb = this.add.image(CX, CY, 'joy_thumb').setScale(2).setAlpha(0.5).setDepth(52).setScrollFactor(0);
+    const drawThumb = (tx, ty) => thumb.setPosition(tx, ty);
 
     // Update flags and thumb from pointer position
     const update = (ptr) => {
