@@ -1743,6 +1743,11 @@ class GameScene extends Phaser.Scene {
       enemy.stunned   = false;
       enemy.dir       = fromLeft ? 1 : -1;
       enemy.setFlipX(enemy.dir < 0);
+      enemy.pace      = 1;
+      enemy.paceUntil = this.time.now + Phaser.Math.Between(1000, 3000);
+      // Pursuers hold this far from the player instead of stacking under them. It shrinks as the
+      // score climbs (to half at 10,000), so they crowd in harder later in a run.
+      enemy.standoff  = Phaser.Math.Between(90, 150) * Math.max(0.5, 1 - this.score / 20000);
       this.physics.add.collider(enemy, this.platforms); // no pallet collision — enemies walk through them
     }
   }
@@ -2227,20 +2232,37 @@ class GameScene extends Phaser.Scene {
     this.enemies.getChildren().forEach(enemy => {
       if (!enemy.active || enemy.stunned) return;
 
+      // Every 1–3s each enemy re-rolls its pace: mostly steady, sometimes a short stop or a burst.
+      if (time > enemy.paceUntil) {
+        const roll = Math.random();
+        enemy.pace      = roll < 0.15 ? 0 : roll < 0.3 ? 1.7 : 1;
+        enemy.paceUntil = time + (enemy.pace === 1 ? Phaser.Math.Between(1000, 3000) : Phaser.Math.Between(400, 900));
+      }
+      const onScreen = enemy.x >= 0 && enemy.x <= C.WIDTH;
+
       if (enemy.randomWalk) {
-        // Workers walk straight across — no bouncing, destroyed when off-screen
+        // Workers walk straight across — no bouncing, destroyed when off-screen. They never stop
+        // off-screen, so nobody lingers out of view.
+        const pace = onScreen ? enemy.pace : Math.max(1, enemy.pace);
         enemy.setFlipX(enemy.dir < 0);
-        enemy.setVelocityX(enemy.dir * enemy.speed);
+        enemy.setVelocityX(enemy.dir * enemy.speed * pace);
+        pace ? enemy.anims.resume() : enemy.anims.pause();
       } else {
-        // All other enemies pursue player horizontally
+        // Pursuers face the player and close to their standoff distance, backing off if nearer.
         const toPlayer = this.player.x - enemy.x;
+        const dist     = Math.abs(toPlayer);
         enemy.dir = toPlayer > 0 ? 1 : -1;
         enemy.setFlipX(enemy.dir < 0);
-        enemy.setVelocityX(enemy.dir * enemy.speed);
+        let move = 0;
+        if (!onScreen || dist > enemy.standoff + 20) move = enemy.dir * Math.max(onScreen ? 0 : 1, enemy.pace);
+        else if (dist < enemy.standoff - 20)         move = -enemy.dir * 0.6 * enemy.pace;
+        // Backing off never walks them out of the screen, where they would be culled.
+        if ((move < 0 && enemy.x < 24) || (move > 0 && enemy.x > C.WIDTH - 24)) move = 0;
+        enemy.setVelocityX(move * enemy.speed);
+        move ? enemy.anims.resume() : enemy.anims.pause();
 
         // Guard: shoot toward player with arc aimed at their position
         if (enemy.enemyType === 'guard') {
-          const onScreen = enemy.x >= 0 && enemy.x <= C.WIDTH;
           if (onScreen && time - enemy.lastShot > enemy.shootDelay) {
             enemy.lastShot   = time;
             enemy.shootDelay = Phaser.Math.Between(2500, 4500);
@@ -2250,7 +2272,6 @@ class GameScene extends Phaser.Scene {
 
         // Manager: throw clipboard aimed at player position
         if (enemy.enemyType === 'manager') {
-          const onScreen = enemy.x >= 0 && enemy.x <= C.WIDTH;
           if (onScreen && time - enemy.lastThrow > enemy.throwDelay) {
             enemy.lastThrow  = time;
             enemy.throwDelay = Phaser.Math.Between(2000, 3500);
