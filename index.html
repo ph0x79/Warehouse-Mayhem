@@ -915,22 +915,21 @@ class BootScene extends Phaser.Scene {
       g.destroy();
     }
 
-    // ── DART (tranquilizer) — flies right: blue flight, pale shaft, red wedge tip
+    // ── DART (foam blaster dart) — flies right: blue foam body, rounded orange tip
     {
       const KEY = {
         '.': null, k: P.INK,
-        f: P.SKY, F: P.BLUE,
-        c: P.CREAM, C: P.GREY_5,
-        r: P.RED_L, R: P.RED,
+        f: P.SKY, F: P.BLUE, D: P.BLUE_D,
+        o: P.ORANGE_L, O: P.ORANGE, d: P.ORANGE_D,
       };
       const g = this.make.graphics({ add: false });
       paintGrid(g, [
-        'kffk..........',
-        'kfFkkkkkkkrRk.',
-        'kffkcccccrrRRk',
-        'kfFkcCCCCrRRRk',
-        'kfFkkkkkkkRRk.',
-        'kffk..........',
+        '.kkkkkkkkkkk..',
+        'kfffffffoook..',
+        'kFFFFFFFoOOOk.',
+        'kFFFFFFFOOOOk.',
+        'kDDDDDDDdddk..',
+        '.kkkkkkkkkkk..',
       ], KEY);
       g.generateTexture('dart', 14, 6);
       g.destroy();
