@@ -71,6 +71,7 @@ try {
     });
     g.spawnBoss();
     g.boss.speed = 0;
+    g.boss.nextJump = Infinity;
     g.boss.x = 760;
   });
   await page.waitForTimeout(1500);

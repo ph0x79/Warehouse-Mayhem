@@ -22,6 +22,7 @@ try {
     });
     g.spawnBoss();
     g.boss.speed = 0;
+    g.boss.nextJump = Infinity;
     g.boss.x = 800;
   }, TYPES);
   await page.waitForTimeout(1500);  // let gravity settle

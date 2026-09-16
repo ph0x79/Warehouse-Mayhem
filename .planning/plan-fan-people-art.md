@@ -170,6 +170,7 @@ spacebar bar across the bottom row, and a 3-column numpad block set off by a gap
 
 The warehouse photos also show a yellow overhead crane bridge, orange traffic cones and stacked
 floor pallets. Worth adding to the background later; filing rather than building.
+**Done 2026-09-16** in commit 5ecae98 (merged via `feat/long-runs`).
 
 **Verify.** `node tests/snapshot.mjs people worker,worker_overalls,worker_coveralls,guard,manager,keyboard`,
 then `bash tests/run.sh` — `floor.test.mjs` fails any variant that breaks the 16×34 / row-31 baseline.

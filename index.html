@@ -234,6 +234,26 @@ class BootScene extends Phaser.Scene {
       r(P.YEL_L, lx - 5, 52, 10, 2);                                 // lens
     }
 
+    // ── Overhead crane bridge: yellow box girder along the top of the wall, gapped around the
+    // fan's sweep (hub sits at grid ~240,26; FAN_HIT_RX/RY give grid x ~155-325) so it reads as
+    // its own structure rather than part of the fan. Kept below the HUD's cooldown-bar row
+    // (screen y ~58, grid ~29) and clear of the pipe band at grid y40.
+    const craneY = 30, craneH = 5;
+    for (const [gx, gw] of [[20, 128], [332, 128]]) {
+      r(P.YEL_DD, gx, craneY, gw, craneH);
+      r(P.YEL_D, gx, craneY, gw, 1);                                  // top highlight
+      r(P.INK, gx, craneY + craneH - 1, gw, 1);                       // bottom shadow
+    }
+    for (const ex of [20, 440]) {                                    // end trucks, hazard-striped
+      r(P.GREY_1, ex, craneY + craneH, 12, 3);
+      for (let i = 0; i < 3; i++) r(P.YEL_DD, ex + 1 + i * 4, craneY + craneH, 2, 3);
+    }
+    const trolleyX = 90;                                              // hoist trolley, off-centre from the fan
+    r(P.GREY_1, trolleyX, craneY + craneH, 14, 3);
+    r(P.GREY_3, trolleyX + 1, craneY + craneH + 1, 12, 1);
+    r(P.GREY_1, trolleyX + 6, craneY + craneH + 3, 2, 1);             // cable
+    r(P.GREY_3, trolleyX + 5, craneY + craneH + 4, 4, 1);             // hook
+
     // ── Pipes along the top of the wall
     r(P.GREY_1, 0, 46, 480, 1);
     r(P.GREY_3, 0, 40, 480, 5);
@@ -277,6 +297,29 @@ class BootScene extends Phaser.Scene {
     r(P.ORANGE_D, 365, 223, 1, 12);
     r(P.GREY_1, 365, 219, 4, 3);
     r(P.GREY_1, 362, 236, 10, 2);
+
+    // ── Wooden pallet stacks against the wall base, clear of the door and extinguisher
+    const pallet = (x, w) => {
+      const h = 15, yTop = 288 - h;
+      r(P.BROWN_0, x, yTop, w, h);
+      for (let i = 0; i < 3; i++) {
+        const py = yTop + i * 5;
+        r(P.BROWN_2, x, py, w, 4);
+        r(P.BROWN_3, x, py, w, 1);                                    // top edge highlight
+        for (let sx = 2; sx < w; sx += 6) r(P.BROWN_0, x + sx, py, 1, 4); // slat gaps
+      }
+    };
+    pallet(6, 26);
+    pallet(444, 26);
+
+    // ── Traffic cones at the wall base
+    const cone = (x) => {
+      r(P.ORANGE_D, x, 286, 8, 2);                                    // base
+      r(P.ORANGE, x + 1, 280, 6, 6);                                  // body
+      r(P.CREAM, x + 1, 282, 6, 1);                                   // reflective band
+      r(P.ORANGE_L, x + 3, 278, 2, 2);                                // tip
+    };
+    for (const cx of [38, 420, 432]) cone(cx);
 
     // ── Floor: polished concrete
     r(P.GREY_3, 0, 288, 480, 32);
@@ -872,22 +915,21 @@ class BootScene extends Phaser.Scene {
       g.destroy();
     }
 
-    // ── DART (tranquilizer) — flies right: blue flight, pale shaft, red wedge tip
+    // ── DART (foam blaster dart) — flies right: blue foam body, rounded orange tip
     {
       const KEY = {
         '.': null, k: P.INK,
-        f: P.SKY, F: P.BLUE,
-        c: P.CREAM, C: P.GREY_5,
-        r: P.RED_L, R: P.RED,
+        f: P.SKY, F: P.BLUE, D: P.BLUE_D,
+        o: P.ORANGE_L, O: P.ORANGE, d: P.ORANGE_D,
       };
       const g = this.make.graphics({ add: false });
       paintGrid(g, [
-        'kffk..........',
-        'kfFkkkkkkkrRk.',
-        'kffkcccccrrRRk',
-        'kfFkcCCCCrRRRk',
-        'kfFkkkkkkkRRk.',
-        'kffk..........',
+        '.kkkkkkkkkkk..',
+        'kfffffffoook..',
+        'kFFFFFFFoOOOk.',
+        'kFFFFFFFOOOOk.',
+        'kDDDDDDDdddk..',
+        '.kkkkkkkkkkk..',
       ], KEY);
       g.generateTexture('dart', 14, 6);
       g.destroy();
@@ -1516,7 +1558,8 @@ class GameScene extends Phaser.Scene {
     this.setupTouchControls();
     this.setupUI();
     this.setupSpawnTimer();
-    this.bossSpawned = false;
+    this.bossNum       = 0;       // bosses spawned so far this run
+    this.nextBossScore = 10000;   // a new boss every 10,000 points
     this.boss        = null;
 
     // Pin world bounds to the design size. Redundant while scale.mode is NONE, but
@@ -1742,6 +1785,9 @@ class GameScene extends Phaser.Scene {
       enemy.stunned   = false;
       enemy.dir       = fromLeft ? 1 : -1;
       enemy.setFlipX(enemy.dir < 0);
+      enemy.pace      = 1;
+      enemy.paceUntil = this.time.now + Phaser.Math.Between(1000, 3000);
+      enemy.dirUntil  = this.time.now + Phaser.Math.Between(1500, 3000);
       this.physics.add.collider(enemy, this.platforms); // no pallet collision — enemies walk through them
     }
   }
@@ -1839,8 +1885,10 @@ class GameScene extends Phaser.Scene {
     // The fan only charges on points earned while it is idle and out of cooldown. Every scoring
     // path routes through here, including the nuke's own kills, so this is the one place to gate.
     if (!this.fanSpinning && this.time.now >= this.fanLockoutUntil) this.fanCharge += pts;
-    if (this.score >= 10000 && !this.bossSpawned) {
-      this.bossSpawned = true;
+    // Gated on no boss on screen: hitBoss() scores before clearing this.boss, and a boss still alive
+    // at the next threshold delays the next one until he is gone.
+    if (this.score >= this.nextBossScore && !this.boss) {
+      this.nextBossScore += 10000;
       this.spawnBoss();
     }
 
@@ -2220,24 +2268,49 @@ class GameScene extends Phaser.Scene {
     });
   }
 
+  // Every 1–3s an enemy re-rolls its pace: mostly steady, sometimes a short stop or a burst.
+  rollPace(e, time) {
+    if (time <= e.paceUntil) return;
+    const roll = Math.random();
+    e.pace      = roll < 0.15 ? 0 : roll < 0.3 ? 1.7 : 1;
+    e.paceUntil = time + (e.pace === 1 ? Phaser.Math.Between(1000, 3000) : Phaser.Math.Between(400, 900));
+  }
+
+  // Throwers and the boss roam back and forth: every 1.5–4s they pick a direction, usually toward
+  // the player, and they turn back at the screen edges. Returns the velocity multiplier.
+  roam(e, time) {
+    if (time > e.dirUntil) {
+      e.dir      = Math.random() < 0.65 ? (this.player.x < e.x ? -1 : 1) : -e.dir;
+      e.dirUntil = time + Phaser.Math.Between(1500, 4000);
+    }
+    if (e.x < 40) e.dir = 1;
+    else if (e.x > C.WIDTH - 40) e.dir = -1;
+    e.setFlipX(e.dir < 0);
+    // Off screen they always walk in: no stopping where the player can't see them.
+    return e.x < 0 || e.x > C.WIDTH ? e.dir : e.dir * e.pace;
+  }
+
   updateEnemies(time, delta) {
     this.enemies.getChildren().forEach(enemy => {
       if (!enemy.active || enemy.stunned) return;
 
+      this.rollPace(enemy, time);
+      const onScreen = enemy.x >= 0 && enemy.x <= C.WIDTH;
+
       if (enemy.randomWalk) {
-        // Workers walk straight across — no bouncing, destroyed when off-screen
+        // Workers walk straight across — no bouncing, destroyed when off-screen. They never stop
+        // off-screen, so nobody lingers out of view.
+        const pace = onScreen ? enemy.pace : Math.max(1, enemy.pace);
         enemy.setFlipX(enemy.dir < 0);
-        enemy.setVelocityX(enemy.dir * enemy.speed);
+        enemy.setVelocityX(enemy.dir * enemy.speed * pace);
+        pace ? enemy.anims.resume() : enemy.anims.pause();
       } else {
-        // All other enemies pursue player horizontally
-        const toPlayer = this.player.x - enemy.x;
-        enemy.dir = toPlayer > 0 ? 1 : -1;
-        enemy.setFlipX(enemy.dir < 0);
-        enemy.setVelocityX(enemy.dir * enemy.speed);
+        const move = this.roam(enemy, time);
+        enemy.setVelocityX(move * enemy.speed);
+        move ? enemy.anims.resume() : enemy.anims.pause();
 
         // Guard: shoot toward player with arc aimed at their position
         if (enemy.enemyType === 'guard') {
-          const onScreen = enemy.x >= 0 && enemy.x <= C.WIDTH;
           if (onScreen && time - enemy.lastShot > enemy.shootDelay) {
             enemy.lastShot   = time;
             enemy.shootDelay = Phaser.Math.Between(2500, 4500);
@@ -2247,7 +2320,6 @@ class GameScene extends Phaser.Scene {
 
         // Manager: throw clipboard aimed at player position
         if (enemy.enemyType === 'manager') {
-          const onScreen = enemy.x >= 0 && enemy.x <= C.WIDTH;
           if (onScreen && time - enemy.lastThrow > enemy.throwDelay) {
             enemy.lastThrow  = time;
             enemy.throwDelay = Phaser.Math.Between(2000, 3500);
@@ -2267,14 +2339,27 @@ class GameScene extends Phaser.Scene {
     this.boss.play('boss_walk');
     this.boss.setScale(2).setDepth(4);
     this.boss.setCollideWorldBounds(false);
-    this.boss.bossHP     = 3;
+    // Each return is tougher: +1 HP, +10 speed (capped), throws sooner. Boss #1 is the original.
+    const n = ++this.bossNum;
+    this.boss.bossNum    = n;
+    this.boss.bossHP     = 2 + n;
     this.boss.stunned    = false;
     this.boss.dir        = fromLeft ? 1 : -1;
-    this.boss.speed      = 60;
+    this.boss.speed      = Math.min(100, 50 + n * 10);
     this.boss.lastThrow  = this.time.now;
     this.boss.throwDelay = 2000;
+    this.boss.pace       = 1;
+    this.boss.paceUntil  = this.time.now + 2000;
+    this.boss.dirUntil   = this.time.now + 2000;
+    this.boss.nextJump   = this.time.now + 2000;
     this.boss.setFlipX(this.boss.dir < 0);
-    this.physics.add.collider(this.boss, this.platforms);
+    // Shelves are one-way for him: he jumps up through them and lands only when he was above the
+    // shelf last frame, and drops through while dropUntil is ahead. The floor always holds.
+    this.boss.dropUntil = 0;
+    this.physics.add.collider(this.boss, this.platforms, null, (boss, plat) =>
+      plat.body.top >= C.HEIGHT - 64 ||
+      (boss.body.velocity.y >= 0 && this.time.now > boss.dropUntil &&
+       boss.body.prev.y + boss.body.height <= plat.body.top + 4));
 
     // Sprite first: Phaser passes (sprite, groupChild) whichever order the args
     // are given, so (poops, boss) handed the boss in as `poop` and destroyed it.
@@ -2286,7 +2371,7 @@ class GameScene extends Phaser.Scene {
     });
 
     SFX.sitesDown();
-    const alert = this.add.text(C.WIDTH / 2, C.HEIGHT / 2 - 40, '⚠ BOSS INCOMING ⚠', {
+    const alert = this.add.text(C.WIDTH / 2, C.HEIGHT / 2 - 40, n === 1 ? '⚠ BOSS INCOMING ⚠' : `⚠ BOSS IS BACK ×${n} ⚠`, {
       fontFamily: 'industry, Arial Black, sans-serif', fontSize: '28px',
       color: '#FF4444', stroke: '#000', strokeThickness: 5
     }).setOrigin(0.5).setDepth(50);
@@ -2305,7 +2390,7 @@ class GameScene extends Phaser.Scene {
       onComplete: () => {
         if (!this.boss || !this.boss.active) return;
         if (this.boss.bossHP <= 0) {
-          this.addScore(2000, this.boss.x, this.boss.y - 30);
+          this.addScore(2000 * this.boss.bossNum, this.boss.x, this.boss.y - 30);
           this.doSplat(this.boss.x, this.boss.y);
           this.boss.destroy();
           this.boss = null;
@@ -2330,19 +2415,31 @@ class GameScene extends Phaser.Scene {
 
   updateBoss(time) {
     if (!this.boss || !this.boss.active || this.boss.stunned) return;
+    const b = this.boss;
 
     // Speed up while fan is spinning (charged and armed)
-    const currentSpeed = this.fanSpinning ? this.boss.speed * 1.5 : this.boss.speed;
+    const currentSpeed = this.fanSpinning ? b.speed * 1.5 : b.speed;
 
-    const toPlayer = this.player.x - this.boss.x;
-    this.boss.dir = toPlayer > 0 ? 1 : -1;
-    this.boss.setFlipX(this.boss.dir < 0);
-    this.boss.setVelocityX(this.boss.dir * currentSpeed);
+    this.rollPace(b, time);
+    const move = this.roam(b, time);
+    // A jump is a lunge: 2.5× speed in the air carries him far enough to land on a shelf.
+    b.setVelocityX((b.body.blocked.down ? move : b.dir * 2.5) * currentSpeed);
+    move ? b.anims.resume() : b.anims.pause();
+
+    // Every 2–4s on solid ground he may change level: drop through his shelf when the player is
+    // below, jump up when the player is above, otherwise jump now and then anyway.
+    if (b.body.blocked.down && time > b.nextJump) {
+      b.nextJump = time + Phaser.Math.Between(2000, 4000);
+      const onShelf = b.body.bottom < C.HEIGHT - 70;
+      if (onShelf && this.player.y > b.y + 60)                   b.dropUntil = time + 250;
+      else if (this.player.y < b.y - 60 || Math.random() < 0.3) b.setVelocityY(-560);
+    }
 
     const onScreen = this.boss.x >= 0 && this.boss.x <= C.WIDTH;
     if (onScreen && time - this.boss.lastThrow > this.boss.throwDelay) {
       this.boss.lastThrow  = time;
-      this.boss.throwDelay = Phaser.Math.Between(1800, 3000);
+      const faster = (this.boss.bossNum - 1) * 200;
+      this.boss.throwDelay = Phaser.Math.Between(Math.max(1000, 1800 - faster), Math.max(1600, 3000 - faster));
       this.throwBossKeyboard(this.boss);
     }
 
@@ -2380,7 +2477,7 @@ class GameScene extends Phaser.Scene {
     const H = C.HEIGHT, W = C.WIDTH, floorTop = H - 64;
     this.platforms.create(W/2, H-32, null).setDisplaySize(W, 64).refreshBody().setAlpha(0);
     this.addShelfUnit(160,  [440, 330, 220]);
-    this.addPallet(230, floorTop);
+    this.addPallet(355, floorTop);   // centred in the gap between shelf units, like the one at 710
     this.addShelfUnit(550,  [410, 300]);
     this.addPallet(710, floorTop);
     this.addShelfUnit(870,  [390, 270, 160]);

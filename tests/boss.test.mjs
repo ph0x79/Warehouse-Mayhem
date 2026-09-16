@@ -58,8 +58,20 @@ try {
   assert.equal(s.alive, false, 'boss defeated on hit 3');
   assert.equal(s.score, scoreBefore + 2000, 'defeat awards 2000 points');
 
+  // He returns every 10,000 points with one more HP, but never while one is still on screen.
+  await page.evaluate(() => window.__game.scene.getScene('Game').addScore(20000 - window.__game.scene.getScene('Game').score, 480, 300));
+  await page.waitForTimeout(500);
+  s = await snap();
+  assert.deepEqual([s.alive, s.hp], [true, 4], 'boss #2 spawns at 20,000 with 4 HP');
+  const bossNumAt30k = await page.evaluate(() => {
+    const g = window.__game.scene.getScene('Game');
+    g.addScore(10000, 480, 300);
+    return g.bossNum;
+  });
+  assert.equal(bossNumAt30k, 2, 'no second boss while one is alive');
+
   assert.deepEqual(errors, [], 'page errors');
-  console.log('PASS boss: 3 hits, fan-immune, +2000');
+  console.log('PASS boss: 3 hits, fan-immune, +2000, returns tougher every 10,000');
 } finally {
   await browser.close();
 }
