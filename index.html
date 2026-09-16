@@ -1944,6 +1944,15 @@ class GameScene extends Phaser.Scene {
     this.input.on('pointermove', (ptr) => {
       if (ptr.id !== this.joystickPointerId) this.reticle.setPosition(ptr.x, ptr.y);
     });
+
+    // The reticle is the aim cursor, so hide the arrow sitting on top of it. setDefaultCursor
+    // writes to the canvas style and that outlives the scene, so every way out restores it.
+    // Pause matters most: togglePause() pauses the scene rather than stopping it, so a restore
+    // on shutdown alone would leave the pause screen with no cursor.
+    this.input.setDefaultCursor('none');
+    this.events.on('pause',       () => this.input.setDefaultCursor('default'));
+    this.events.on('resume',      () => this.input.setDefaultCursor('none'));
+    this.events.once('shutdown',  () => this.input.setDefaultCursor('default'));
   }
 
   setupInput() {
@@ -2075,6 +2084,7 @@ class GameScene extends Phaser.Scene {
   // ─────────────────────────────────────────────────────────
   triggerGameOver() {
     this.gameRunning = false;
+    this.input.setDefaultCursor('default');   // back the moment they die, not 1200ms later
     this.touchLeft = this.touchRight = this.touchJump = false;
     this.joystickPointerId = -1;
     SFX.gameOver();
