@@ -37,8 +37,28 @@ try {
   assert.deepEqual(highlighted(rows), ['2. ABB 4600'], 'existing entry highlighted');
   assert.equal(rows.filter(([t]) => t.includes('ABB')).length, 1, 'no duplicate row');
 
+  // A non-qualifying score skips the initials prompt; a qualifying one still gets it.
+  const sceneAfterGameOver = async score => {
+    await page.evaluate(score => {
+      const m = window.__game.scene;
+      m.getScenes(true).forEach(s => m.stop(s.scene.key));
+      m.start('Game');
+    }, score);
+    await page.waitForTimeout(1000);
+    await page.evaluate(score => {
+      const g = window.__game.scene.getScene('Game');
+      g.score = score;
+      g.triggerGameOver();
+    }, score);
+    await page.waitForTimeout(2500);
+    return page.evaluate(() => window.__game.scene.getScenes(true).map(s => s.scene.key));
+  };
+
+  assert.ok((await sceneAfterGameOver(50)).includes('GameOver'), 'score below 10th place skips initials');
+  assert.ok((await sceneAfterGameOver(9999)).includes('EnterInitials'), 'top-10 score still prompts for initials');
+
   assert.deepEqual(errors, [], 'page errors');
-  console.log('PASS gameover: top 10 always shown, own row highlighted');
+  console.log('PASS gameover: top 10 always shown, own row highlighted, initials only when qualifying');
 } finally {
   await browser.close();
 }

@@ -2057,8 +2057,12 @@ class GameScene extends Phaser.Scene {
     this.enemies.getChildren().forEach(e => e.setVelocity(0, 0));
     this.forklifts.getChildren().forEach(f => f.setVelocity(0, 0));
     if (this.boss && this.boss.active) { this.boss.setVelocity(0, 0); }
-    this.time.delayedCall(1200, () => {
-      this.scene.start('EnterInitials', { score: this.score });
+    this.time.delayedCall(1200, async () => {
+      // Only prompt for initials when the score actually makes the top 10.
+      const scores = await fetchTopScores();
+      const qualifies = this.score > 0 && (scores.length < 10 || this.score > scores[scores.length - 1].score);
+      if (qualifies) this.scene.start('EnterInitials', { score: this.score });
+      else this.scene.start('GameOver', { score: this.score, initials: '' });
     });
   }
 
@@ -2291,9 +2295,9 @@ class GameOverScene extends Phaser.Scene {
       stroke: '#000', strokeThickness: 6
     }).setOrigin(0.5);
 
-    const initials = data.initials.trim().toUpperCase();
+    const initials = (data.initials || '').trim().toUpperCase();
     const score = data.score || 0;
-    this.add.text(W/2, 120, initials + '  \u2014  ' + score, {
+    this.add.text(W/2, 120, (initials ? initials + '  \u2014  ' : '') + score, {
       fontFamily: 'industry, Arial Black, sans-serif', fontSize: '32px', color: '#FFC425',
       stroke: '#000', strokeThickness: 4
     }).setOrigin(0.5);
@@ -2309,8 +2313,8 @@ class GameOverScene extends Phaser.Scene {
     fetchTopScores().then(scores => {
       if (!this.scene.isActive('GameOver')) return;
       // get-scores is cached for 30s, so the score just submitted can be missing: add it locally if it qualifies.
-      let mine = scores.findIndex(s => s.initials === initials && s.score === score);
-      if (mine < 0 && (scores.length < 10 || score > scores[scores.length - 1].score)) {
+      let mine = initials ? scores.findIndex(s => s.initials === initials && s.score === score) : -1;
+      if (initials && mine < 0 && (scores.length < 10 || score > scores[scores.length - 1].score)) {
         mine = scores.findIndex(s => s.score < score);
         if (mine < 0) mine = scores.length;
         scores.splice(mine, 0, { initials, score });
