@@ -1142,70 +1142,127 @@ class BootScene extends Phaser.Scene {
   }
 
   makePlatformTextures() {
-    // ── SHELF PLATFORM (long metal shelf)
+    const patch = (row, col, s) => row.slice(0, col) + s + row.slice(col + s.length);
+
+    // ── SHELF PLATFORM (200x16) — rolled steel box beam seen flat-on. The sprite is placed
+    // with origin (0.5, 0) and feet land on row 4, so rows 0-4 are all top surface: one bright
+    // line then an unbroken lit lip, no crease until row 5. No ink on the steel anywhere:
+    // eight beams and six posts outlined in black would read as a cage.
     {
-      const W = 200, H = 16;
-      const g = this.make.graphics({ add: false });
-      // Top highlight
-      px(g, P.GREY_5, 0,  0, W,  3);
-      // Main shelf body
-      px(g, P.GREY_4, 0,  3, W,  8);
-      // Shelf shadow
-      px(g, P.GREY_2,  0, 11, W,  5);
-      // Rivets
-      for (let x = 12; x < W - 12; x += 40) {
-        px(g, P.GREY_5, x, 5, 3, 3);
+      const KEY = { '.': null, n: P.GREY_1, m: P.GREY_2, G: P.GREY_3, g: P.GREY_4, l: P.GREY_5 };
+      const band = c => c.repeat(200);
+      const bolts = (row, s) => {
+        let r = row;
+        for (let x = 18; x < 190; x += 40) r = patch(r, x, s);
+        return r;
+      };
+      const rows = [
+        band('l'),                 // 0  hard top edge, the standing line
+        band('g'),                 // 1  lit top lip
+        band('g'),                 // 2
+        band('g'),                 // 3
+        band('g'),                 // 4  feet land here
+        band('G'),                 // 5  crease under the lip
+        band('g'),                 // 6  web face
+        bolts(band('g'), 'll'),    // 7  bolt heads, lit top
+        bolts(band('g'), 'mm'),    // 8  bolt heads, shaded bottom
+        band('G'),                 // 9
+        band('G'),                 // 10
+        band('m'),                 // 11 bottom flange
+        band('m'),                 // 12
+        band('m'),                 // 13
+        band('n'),                 // 14 underside
+        band('n'),                 // 15
+      ];
+      // End caps: the beam overhangs each upright by 10px, so close the form without ink.
+      for (let y = 0; y < rows.length; y++) {
+        rows[y] = patch(rows[y], 0, y === 0 ? 'gg' : 'mm');
+        rows[y] = patch(rows[y], 198, y === 0 ? 'gg' : 'mm');
       }
-      g.generateTexture('shelf', W, H);
+      const g = this.make.graphics({ add: false });
+      paintGrid(g, rows, KEY);
+      g.generateTexture('shelf', 200, 16);
       g.destroy();
     }
 
-    // ── BOX (stackable crate) — native 18x18, displayed at 2x (36x36) to match the shelf art
+    // ── BOX (18x18, shown at 2x) — a discrete object, so unlike the steel it keeps an ink
+    // outline: lit top lip, shaded right side and underside, one motif only, the X brace.
     {
-      const S = 18;
-      const g = this.make.graphics({ add: false });
-      px(g, P.TAN,   0,  0, S,   S);
-      px(g, P.BROWN_3, 0,  0, S,   2);  // top shade
-      px(g, P.BROWN_2,  0, S-2, S,  2);  // bottom shadow
-      px(g, P.BROWN_2,  S-2, 0, 2,  S);  // right shadow
-      // X cross on box face
-      for (let i = 2; i < S - 2; i++) {
-        px(g, P.BROWN_2, i, i, 1, 1);
-        px(g, P.BROWN_2, S - 1 - i, i, 1, 1);
+      const KEY = { '.': null, k: P.INK, B: P.BROWN_1, b: P.BROWN_2, t: P.TAN_D, T: P.TAN };
+      const rows = [
+        'k'.repeat(18),                                        // 0  ink
+        'k' + 'T'.repeat(16) + 'k',                            // 1  lit top lip
+        'k' + 'T'.repeat(16) + 'k',                            // 2
+        ...Array(12).fill('k' + 't'.repeat(14) + 'bb' + 'k'),  // 3-14 face, right side shaded
+        'k' + 'b'.repeat(16) + 'k',                            // 15 underside shadow
+        'k' + 'b'.repeat(16) + 'k',                            // 16
+        'k'.repeat(18),                                        // 17 ink
+      ];
+      // X brace across the face, rows 3-14.
+      for (let i = 0; i < 12; i++) {
+        const c = 1 + Math.round((i * 15) / 11);
+        rows[3 + i] = patch(rows[3 + i], c, 'B');
+        rows[3 + i] = patch(rows[3 + i], 17 - c, 'B');
       }
-      g.generateTexture('box', S, S);
+      const g = this.make.graphics({ add: false });
+      paintGrid(g, rows, KEY);
+      g.generateTexture('box', 18, 18);
       g.destroy();
     }
 
-    // ── PALLET
+    // ── PALLET (80x14) — side-on, stacked two high on the floor. Row 0 is the standing line,
+    // so the top board stays flat and unbroken; three feet with open air between them.
     {
-      const W = 80, H = 14;
-      const g = this.make.graphics({ add: false });
-      // Boards
-      for (let x = 0; x < W; x += 16) {
-        px(g, P.TAN_D,   x,  0, 14,  H);
-        px(g, P.BROWN_2, x + 12, 0,  2, H);
+      const KEY = { '.': null, B: P.BROWN_1, b: P.BROWN_2, t: P.TAN_D, T: P.TAN };
+      const band = c => c.repeat(80);
+      const BLOCKS = [0, 34, 68];            // 12-wide feet
+      const BLOCK = 'Tttttttttbbb';          // lit left edge, shaded right
+      const blockRow = (fill) => {
+        let r = band('.');
+        for (const x of BLOCKS) r = patch(r, x, fill);
+        return r;
+      };
+      const rows = [
+        band('T'),                           // 0  top board, the standing line
+        band('t'),                           // 1
+        band('t'),                           // 2
+        band('b'),                           // 3  under-edge of the top deck
+        blockRow('B'.repeat(12)),            // 4  shadow on top of each foot
+        blockRow(BLOCK),                     // 5
+        blockRow(BLOCK),                     // 6
+        blockRow(BLOCK),                     // 7
+        blockRow(BLOCK),                     // 8
+        blockRow('b'.repeat(12)),            // 9
+        band('t'),                           // 10 bottom deck
+        band('t'),                           // 11
+        band('b'),                           // 12
+        band('B'),                           // 13 ground shadow
+      ];
+      // Board seams: 1px gaps between planks, kept off the flat top row.
+      for (const x of [15, 31, 47, 63]) {
+        for (const y of [1, 2, 10, 11]) rows[y] = patch(rows[y], x, 'B');
       }
-      // Top slats
-      px(g, P.TAN_D,   0, 0, W, 3);
-      px(g, P.TAN_D,   0, 6, W, 3);
-      px(g, P.BROWN_2, 0, H-2, W, 2);
-      g.generateTexture('pallet', W, H);
+      const g = this.make.graphics({ add: false });
+      paintGrid(g, rows, KEY);
+      g.generateTexture('pallet', 80, 14);
       g.destroy();
     }
 
-    // ── SHELF UPRIGHT (vertical support)
+    // ── SHELF UPRIGHT (12x200) — punched rack post, lit from the left. Drawn as a TileSprite
+    // stretched to any height, so every row is a pure function of y % 20. 20 divides 200, so
+    // row 199 flows into row 0 with no seam. The highlight stops at GREY_4 on purpose: six of
+    // these stand on screen at once and a bright stripe down each one reads as a cage.
     {
-      const W = 12, H = 200;
+      const KEY = { '.': null, n: P.GREY_1, m: P.GREY_2, G: P.GREY_3, g: P.GREY_4 };
+      const POST = 'mGggggGGGmmn';           // dark edge, lit face, shaded face, dark edge
+      const SLOT = { 8: 'nnnn', 9: 'mmmm', 10: 'mmmm' };   // one punched slot per 20 rows
+      const rows = Array.from({ length: 200 }, (_, y) => {
+        const s = SLOT[y % 20];
+        return s ? patch(POST, 4, s) : POST;
+      });
       const g = this.make.graphics({ add: false });
-      px(g, P.GREY_4, 0, 0, W, H);
-      px(g, P.GREY_5, 1, 0, 3, H);
-      px(g, P.GREY_2,  W-3, 0, 3, H);
-      // Bolt holes
-      for (let y = 16; y < H; y += 32) {
-        px(g, P.GREY_2, 4, y, 4, 4);
-      }
-      g.generateTexture('shelf_upright', W, H);
+      paintGrid(g, rows, KEY);
+      g.generateTexture('shelf_upright', 12, 200);
       g.destroy();
     }
   }
