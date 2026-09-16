@@ -1,5 +1,5 @@
-// Pursuers hold a standoff distance instead of stacking under the player, and backing off never
-// walks them off screen where they would be culled (issue #5).
+// Throwers and the boss roam back and forth without stopping next to the player or leaving the
+// screen, and the boss jumps for a player above him only when no shelf is overhead (issue #5).
 import assert from 'node:assert/strict';
 import { launch, openGame } from './lib.mjs';
 
@@ -7,50 +7,49 @@ const browser = await launch();
 try {
   const { page, errors } = await openGame(browser, { startGame: true });
 
-  // One guard at a given x, pace pinned to steady so the random stops and bursts don't flake.
-  const place = (x) => page.evaluate((x) => {
+  // One guard at x heading dir, pace steady and direction pinned so randomness doesn't flake.
+  const guard = (x, dir) => page.evaluate(([x, dir]) => {
     const g = window.__game.scene.getScene('Game');
     g.enemies.clear(true, true);
     g.player.x = 480;
     g.spawnEnemy('guard');
     const e = g.enemies.getChildren()[0];
-    e.x = x; e.shootDelay = 1e9; e.pace = 1; e.paceUntil = 1e12; e.standoff = 120;
-  }, x);
-  const read = () => page.evaluate(() => {
-    const g = window.__game.scene.getScene('Game');
-    const e = g.enemies.getChildren()[0];
-    g.player.x = 480;
-    return e ? { alive: e.active, dist: Math.abs(e.x - g.player.x), x: e.x } : { alive: false };
-  });
-
-  await place(500);
-  await page.waitForTimeout(1500);
-  let s = await read();
-  assert.ok(s.alive && s.dist >= 90 && s.dist <= 150, `close guard backs off to its standoff (dist ${s.dist})`);
-
-  await place(900);
-  await page.waitForTimeout(3000);
-  s = await read();
-  assert.ok(s.alive && s.dist >= 90 && s.dist <= 150, `far guard closes to its standoff (dist ${s.dist})`);
-
-  // Player hugging the left wall: the guard wants to back off leftwards past the edge and must stop.
-  await page.evaluate(() => {
-    const g = window.__game.scene.getScene('Game');
-    g.enemies.clear(true, true);
-    g.spawnEnemy('guard');
-    const e = g.enemies.getChildren()[0];
-    e.x = 60; e.shootDelay = 1e9; e.pace = 1; e.paceUntil = 1e12; e.standoff = 120;
-    g.player.x = 90;
-  });
-  await page.waitForTimeout(1500);
-  s = await page.evaluate(() => {
+    Object.assign(e, { x, dir, shootDelay: 1e9, pace: 1, paceUntil: 1e12, dirUntil: 1e12 });
+  }, [x, dir]);
+  const guardX = () => page.evaluate(() => {
     const e = window.__game.scene.getScene('Game').enemies.getChildren()[0];
-    return { alive: !!(e && e.active), x: e ? e.x : null };
+    return e && e.active ? e.x : null;
   });
-  assert.ok(s.alive && s.x >= 0, `guard backed against the edge stays on screen (x ${s.x})`);
+
+  await guard(490, 1);
+  await page.waitForTimeout(800);
+  const passed = await guardX();
+  assert.ok(passed > 540, `guard next to the player keeps walking past (x ${passed})`);
+
+  await guard(60, -1);
+  await page.waitForTimeout(1500);
+  const turned = await guardX();
+  assert.ok(turned !== null && turned > 40, `guard walking into the left edge turns back (x ${turned})`);
+
+  // Boss: player up on a shelf. In the open gap at x 355 he jumps; under a shelf at x 160 he doesn't.
+  const bossJumps = (x) => page.evaluate(async (x) => {
+    const g = window.__game.scene.getScene('Game');
+    if (g.boss) { g.boss.destroy(); g.boss = null; }
+    g.spawnBoss();
+    Object.assign(g.boss, { speed: 0, nextJump: Infinity });
+    g.boss.x = x;
+    g.player.y = 200;
+    await new Promise(r => setTimeout(r, 1200));   // settle on the floor
+    g.boss.nextJump = 0;
+    let minVy = 0;
+    for (let i = 0; i < 20; i++) { minVy = Math.min(minVy, g.boss.body.velocity.y); await new Promise(r => setTimeout(r, 16)); }
+    return minVy < -300;
+  }, x);
+  assert.equal(await bossJumps(355), true, 'boss in the open jumps for a player above');
+  assert.equal(await bossJumps(160), false, 'boss under a shelf does not jump');
 
   assert.deepEqual(errors, [], 'page errors');
-  console.log('PASS movement: pursuers hold a standoff and never back off screen');
+  console.log('PASS movement: throwers roam past the player and turn at edges, boss jumps only with headroom');
 } finally {
   await browser.close();
 }

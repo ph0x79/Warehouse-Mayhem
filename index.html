@@ -1787,9 +1787,7 @@ class GameScene extends Phaser.Scene {
       enemy.setFlipX(enemy.dir < 0);
       enemy.pace      = 1;
       enemy.paceUntil = this.time.now + Phaser.Math.Between(1000, 3000);
-      // Pursuers hold this far from the player instead of stacking under them. It shrinks as the
-      // score climbs (to half at 10,000), so they crowd in harder later in a run.
-      enemy.standoff  = Phaser.Math.Between(90, 150) * Math.max(0.5, 1 - this.score / 20000);
+      enemy.dirUntil  = this.time.now + Phaser.Math.Between(1500, 3000);
       this.physics.add.collider(enemy, this.platforms); // no pallet collision — enemies walk through them
     }
   }
@@ -2270,16 +2268,33 @@ class GameScene extends Phaser.Scene {
     });
   }
 
+  // Every 1–3s an enemy re-rolls its pace: mostly steady, sometimes a short stop or a burst.
+  rollPace(e, time) {
+    if (time <= e.paceUntil) return;
+    const roll = Math.random();
+    e.pace      = roll < 0.15 ? 0 : roll < 0.3 ? 1.7 : 1;
+    e.paceUntil = time + (e.pace === 1 ? Phaser.Math.Between(1000, 3000) : Phaser.Math.Between(400, 900));
+  }
+
+  // Throwers and the boss roam back and forth: every 1.5–4s they pick a direction, usually toward
+  // the player, and they turn back at the screen edges. Returns the velocity multiplier.
+  roam(e, time) {
+    if (time > e.dirUntil) {
+      e.dir      = Math.random() < 0.65 ? (this.player.x < e.x ? -1 : 1) : -e.dir;
+      e.dirUntil = time + Phaser.Math.Between(1500, 4000);
+    }
+    if (e.x < 40) e.dir = 1;
+    else if (e.x > C.WIDTH - 40) e.dir = -1;
+    e.setFlipX(e.dir < 0);
+    // Off screen they always walk in: no stopping where the player can't see them.
+    return e.x < 0 || e.x > C.WIDTH ? e.dir : e.dir * e.pace;
+  }
+
   updateEnemies(time, delta) {
     this.enemies.getChildren().forEach(enemy => {
       if (!enemy.active || enemy.stunned) return;
 
-      // Every 1–3s each enemy re-rolls its pace: mostly steady, sometimes a short stop or a burst.
-      if (time > enemy.paceUntil) {
-        const roll = Math.random();
-        enemy.pace      = roll < 0.15 ? 0 : roll < 0.3 ? 1.7 : 1;
-        enemy.paceUntil = time + (enemy.pace === 1 ? Phaser.Math.Between(1000, 3000) : Phaser.Math.Between(400, 900));
-      }
+      this.rollPace(enemy, time);
       const onScreen = enemy.x >= 0 && enemy.x <= C.WIDTH;
 
       if (enemy.randomWalk) {
@@ -2290,16 +2305,7 @@ class GameScene extends Phaser.Scene {
         enemy.setVelocityX(enemy.dir * enemy.speed * pace);
         pace ? enemy.anims.resume() : enemy.anims.pause();
       } else {
-        // Pursuers face the player and close to their standoff distance, backing off if nearer.
-        const toPlayer = this.player.x - enemy.x;
-        const dist     = Math.abs(toPlayer);
-        enemy.dir = toPlayer > 0 ? 1 : -1;
-        enemy.setFlipX(enemy.dir < 0);
-        let move = 0;
-        if (!onScreen || dist > enemy.standoff + 20) move = enemy.dir * Math.max(onScreen ? 0 : 1, enemy.pace);
-        else if (dist < enemy.standoff - 20)         move = -enemy.dir * 0.6 * enemy.pace;
-        // Backing off never walks them out of the screen, where they would be culled.
-        if ((move < 0 && enemy.x < 24) || (move > 0 && enemy.x > C.WIDTH - 24)) move = 0;
+        const move = this.roam(enemy, time);
         enemy.setVelocityX(move * enemy.speed);
         move ? enemy.anims.resume() : enemy.anims.pause();
 
@@ -2342,6 +2348,10 @@ class GameScene extends Phaser.Scene {
     this.boss.speed      = Math.min(100, 50 + n * 10);
     this.boss.lastThrow  = this.time.now;
     this.boss.throwDelay = 2000;
+    this.boss.pace       = 1;
+    this.boss.paceUntil  = this.time.now + 2000;
+    this.boss.dirUntil   = this.time.now + 2000;
+    this.boss.nextJump   = this.time.now + 2000;
     this.boss.setFlipX(this.boss.dir < 0);
     this.physics.add.collider(this.boss, this.platforms);
 
@@ -2399,14 +2409,30 @@ class GameScene extends Phaser.Scene {
 
   updateBoss(time) {
     if (!this.boss || !this.boss.active || this.boss.stunned) return;
+    const b = this.boss;
 
     // Speed up while fan is spinning (charged and armed)
-    const currentSpeed = this.fanSpinning ? this.boss.speed * 1.5 : this.boss.speed;
+    const currentSpeed = this.fanSpinning ? b.speed * 1.5 : b.speed;
 
-    const toPlayer = this.player.x - this.boss.x;
-    this.boss.dir = toPlayer > 0 ? 1 : -1;
-    this.boss.setFlipX(this.boss.dir < 0);
-    this.boss.setVelocityX(this.boss.dir * currentSpeed);
+    this.rollPace(b, time);
+    const move = this.roam(b, time);
+    // A jump is a lunge: 2.5× speed in the air carries him far enough to land on a shelf.
+    b.setVelocityX((b.body.blocked.down ? move : b.dir * 2.5) * currentSpeed);
+    move ? b.anims.resume() : b.anims.pause();
+
+    // Every 2–4s on solid ground he may jump: always when the player is above him, otherwise now
+    // and then. Never with a shelf just overhead, which would only bonk him back down.
+    // The timer only restarts once he is clear of shelves, so he jumps as soon as he walks out.
+    if (b.body.blocked.down && time > b.nextJump) {
+      const top  = b.body.top;
+      const roof = this.platforms.getChildren().some(p =>
+        Math.abs(p.x - b.x) < p.body.halfWidth + b.body.halfWidth &&
+        p.body.bottom <= top && p.body.bottom > top - 200);
+      if (!roof) {
+        b.nextJump = time + Phaser.Math.Between(2000, 4000);
+        if (this.player.y < b.y - 60 || Math.random() < 0.3) b.setVelocityY(-560);
+      }
+    }
 
     const onScreen = this.boss.x >= 0 && this.boss.x <= C.WIDTH;
     if (onScreen && time - this.boss.lastThrow > this.boss.throwDelay) {
@@ -2450,7 +2476,7 @@ class GameScene extends Phaser.Scene {
     const H = C.HEIGHT, W = C.WIDTH, floorTop = H - 64;
     this.platforms.create(W/2, H-32, null).setDisplaySize(W, 64).refreshBody().setAlpha(0);
     this.addShelfUnit(160,  [440, 330, 220]);
-    this.addPallet(230, floorTop);
+    this.addPallet(355, floorTop);   // centred in the gap between shelf units, like the one at 710
     this.addShelfUnit(550,  [410, 300]);
     this.addPallet(710, floorTop);
     this.addShelfUnit(870,  [390, 270, 160]);
