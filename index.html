@@ -423,71 +423,80 @@ class BootScene extends Phaser.Scene {
   }
 
   makePoopTextures() {
-    const POOP_BR  = P.BROWN_1;
-    const POOP_L   = P.BROWN_2;
-    const POOP_D   = P.BROWN_0;
-
-    // ── Flying poop projectile (10x10)
+    // ── Flying poop projectile (10x10) — three-tier swirl with a pointed tip
     {
+      const KEY = { '.': null, k: P.INK, h: P.BROWN_3, b: P.BROWN_2, d: P.BROWN_1, D: P.BROWN_0 };
       const g = this.make.graphics({ add: false });
-      // Round swirl shape
-      px(g, POOP_D,  3, 0, 4, 2);
-      px(g, POOP_BR, 2, 1, 6, 2);
-      px(g, POOP_L,  2, 1, 2, 1);  // highlight
-      px(g, POOP_BR, 1, 3, 8, 3);
-      px(g, POOP_L,  2, 3, 2, 1);
-      px(g, POOP_D,  1, 6, 8, 1);
-      px(g, POOP_BR, 0, 7, 10,2);
-      px(g, POOP_D,  0, 9, 10,1);
-      // Stink lines
-      px(g, POOP_D,  4, 0, 1, 1);
-      px(g, POOP_D,  7, 0, 1, 1);
+      paintGrid(g, [
+        '...kkkk...',
+        '...khbk...',
+        '..khhbdk..',
+        '.khhbbbdk.',
+        '.kbbbbbdk.',
+        '.kdddddDk.',
+        'khhbbbbddk',
+        'khbbbbbDDk',
+        'kddddddDDk',
+        '.kkkkkkkk.',
+      ], KEY);
       g.generateTexture('poop', 10, 10);
       g.destroy();
     }
 
-    // ── Splat (16x12) — flat splatter on ground/wall
+    // ── Splat (16x12) — wide lopsided mass with flung specks, left where a shot lands
     {
+      const KEY = { '.': null, k: P.INK, h: P.BROWN_3, b: P.BROWN_2, d: P.BROWN_1 };
       const g = this.make.graphics({ add: false });
-      px(g, POOP_BR, 4,  2, 8,  2);
-      px(g, POOP_BR, 2,  4, 12, 4);
-      px(g, POOP_L,  3,  4, 4,  2);  // highlight blob
-      px(g, POOP_BR, 4,  8, 8,  2);
-      px(g, POOP_D,  3,  9, 10, 2);
-      // Splat drops
-      px(g, POOP_BR, 0,  5, 2, 2);
-      px(g, POOP_BR, 14, 5, 2, 2);
-      px(g, POOP_BR, 6,  0, 2, 2);
-      px(g, POOP_BR, 6, 10, 2, 2);
+      paintGrid(g, [
+        '.......b........',
+        '......bb........',
+        '.b...........b..',
+        '.....kkkkkk.....',
+        '..kkkhhbbbbkk...',
+        '.khhhbbbbbbbdkk.',
+        'khhbbbbbbbbbbddk',
+        'khbbbbbbbbbbbddk',
+        'kbbbbbbbbbbbdddk',
+        '.kbbbbbbbbbddk..',
+        '..kkdddddddkk...',
+        '.b..kkkkkkk..b..',
+      ], KEY);
       g.generateTexture('splat', 16, 12);
       g.destroy();
     }
 
-    // ── Reticle (20x20) — crosshair cursor
+    // ── Reticle (20x20) — four outlined arms with a gap, so the centre dot never hides the aim point
     {
+      const KEY = { '.': null, k: P.INK, r: P.RED_L, R: P.RED };
       const g = this.make.graphics({ add: false });
-      const RC = P.RED_L;
-      const RD = P.RED;
-      // Outer ring
-      px(g, RC, 6,  0, 8, 2);
-      px(g, RC, 6, 18, 8, 2);
-      px(g, RC, 0,  6, 2, 8);
-      px(g, RC,18,  6, 2, 8);
-      // Corner ticks
-      px(g, RD, 4,  4, 3, 2);  px(g, RD, 4, 4, 2, 3);
-      px(g, RD,13,  4, 3, 2);  px(g, RD,14, 4, 2, 3);
-      px(g, RD, 4, 14, 3, 2);  px(g, RD, 4,13, 2, 3);
-      px(g, RD,13, 14, 3, 2);  px(g, RD,14,13, 2, 3);
-      // Center dot
-      px(g, RC, 9,  9, 2, 2);
+      paintGrid(g, [
+        '........kkkk........',
+        '........krRk........',
+        '........krRk........',
+        '........krRk........',
+        '........krRk........',
+        '........krRk........',
+        '........kkkk........',
+        '....................',
+        'kkkkkkk......kkkkkkk',
+        'krrrrrk..rr..krrrrrk',
+        'kRRRRRk..RR..kRRRRRk',
+        'kkkkkkk......kkkkkkk',
+        '....................',
+        '........kkkk........',
+        '........krRk........',
+        '........krRk........',
+        '........krRk........',
+        '........krRk........',
+        '........krRk........',
+        '........kkkk........',
+      ], KEY);
       g.generateTexture('reticle', 20, 20);
       g.destroy();
     }
   }
 
   makeEnemyTextures() {
-
-    const WHITE = P.WHITE;   // still used by the clipboard texture below
 
     // ── SHARED HUMAN GRIDS — 16x34: rows 0-4 hat, 5-13 face, 14-23 torso, 24-31 legs, 32-33 empty.
     // The planted foot's lowest pixel is row 31. Generic chars let each role recolour one grid:
@@ -749,25 +758,51 @@ class BootScene extends Phaser.Scene {
       g.destroy();
     }
 
-    // ── DART (tranquilizer) — tiny needle
+    // ── DART (tranquilizer) — flies right: blue flight, pale shaft, red wedge tip
     {
+      const KEY = {
+        '.': null, k: P.INK,
+        f: P.SKY, F: P.BLUE,
+        c: P.CREAM, C: P.GREY_5,
+        r: P.RED_L, R: P.RED,
+      };
       const g = this.make.graphics({ add: false });
-      px(g, P.CREAM,  0, 2, 10, 2);  // shaft
-      px(g, P.RED_L, 10, 1,  3, 4);  // tip
-      px(g, P.SKY,    0, 2,  3, 2);  // flight
+      paintGrid(g, [
+        'kffk..........',
+        'kfFkkkkkkkrRk.',
+        'kffkcccccrrRRk',
+        'kfFkcCCCCrRRRk',
+        'kfFkkkkkkkRRk.',
+        'kffk..........',
+      ], KEY);
       g.generateTexture('dart', 14, 6);
       g.destroy();
     }
 
-    // ── CLIPBOARD — thrown by manager
+    // ── CLIPBOARD — thrown by the manager: tan board, lined paper, grey clip
     {
+      const KEY = {
+        '.': null, k: P.INK,
+        t: P.TAN, T: P.TAN_D,
+        w: P.WHITE, l: P.GREY_4,
+        g: P.GREY_5, G: P.GREY_4,
+      };
       const g = this.make.graphics({ add: false });
-      px(g, P.TAN,  0,  0, 10, 13);
-      px(g, WHITE,     1,  2,  8,  9);
-      px(g, P.GREY_3,  2,  3,  6,  1);
-      px(g, P.GREY_3,  2,  5,  6,  1);
-      px(g, P.GREY_3,  2,  7,  6,  1);
-      px(g, P.GREY_5,  3,  0,  4,  2);  // clip
+      paintGrid(g, [
+        '...kggk...',
+        'kkkkGGkkkk',
+        'ktwwGGwwtk',
+        'ktwwwwwwtk',
+        'ktwllllwtk',
+        'ktwwwwwwtk',
+        'ktwllllwtk',
+        'ktwwwwwwtk',
+        'ktwlllwwtk',
+        'ktwwwwwwtk',
+        'ktwwwwwwtk',
+        'ktTTTTTTtk',
+        'kkkkkkkkkk',
+      ], KEY);
       g.generateTexture('clipboard', 10, 13);
       g.destroy();
     }
@@ -872,18 +907,19 @@ class BootScene extends Phaser.Scene {
         frameRate:5, repeat:-1 });
     }
 
-    // ── KEYBOARD — thrown by boss
+    // ── KEYBOARD — thrown by the boss: dark body, two rows of keys, spacebar below
     {
+      const KEY = { '.': null, k: P.INK, b: P.GREY_2, w: P.GREY_6, W: P.GREY_4 };
       const g = this.make.graphics({ add: false });
-      px(g, P.GREY_3,  0, 0, 14, 7);
-      px(g, P.GREY_2,  0, 6, 14, 1);
-      px(g, P.GREY_4,  1, 1,  2, 2);
-      px(g, P.GREY_4,  4, 1,  2, 2);
-      px(g, P.GREY_4,  7, 1,  2, 2);
-      px(g, P.GREY_4, 10, 1,  2, 2);
-      px(g, P.GREY_4,  2, 4,  2, 2);
-      px(g, P.GREY_4,  6, 4,  3, 2);
-      px(g, P.GREY_4, 10, 4,  2, 2);
+      paintGrid(g, [
+        'kkkkkkkkkkkkkk',
+        'kwwbwwbwwbwwbk',
+        'kWWbWWbWWbWWbk',
+        'kbbbbbbbbbbbbk',
+        'kwwbwwwwwwbwwk',
+        'kWWbWWWWWWbWWk',
+        'kkkkkkkkkkkkkk',
+      ], KEY);
       g.generateTexture('keyboard', 14, 7);
       g.destroy();
     }
