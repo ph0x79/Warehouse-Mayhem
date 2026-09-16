@@ -1516,7 +1516,8 @@ class GameScene extends Phaser.Scene {
     this.setupTouchControls();
     this.setupUI();
     this.setupSpawnTimer();
-    this.bossSpawned = false;
+    this.bossNum       = 0;       // bosses spawned so far this run
+    this.nextBossScore = 10000;   // a new boss every 10,000 points
     this.boss        = null;
 
     // Pin world bounds to the design size. Redundant while scale.mode is NONE, but
@@ -1839,8 +1840,10 @@ class GameScene extends Phaser.Scene {
     // The fan only charges on points earned while it is idle and out of cooldown. Every scoring
     // path routes through here, including the nuke's own kills, so this is the one place to gate.
     if (!this.fanSpinning && this.time.now >= this.fanLockoutUntil) this.fanCharge += pts;
-    if (this.score >= 10000 && !this.bossSpawned) {
-      this.bossSpawned = true;
+    // Gated on no boss on screen: hitBoss() scores before clearing this.boss, and a boss still alive
+    // at the next threshold delays the next one until he is gone.
+    if (this.score >= this.nextBossScore && !this.boss) {
+      this.nextBossScore += 10000;
       this.spawnBoss();
     }
 
@@ -2267,10 +2270,13 @@ class GameScene extends Phaser.Scene {
     this.boss.play('boss_walk');
     this.boss.setScale(2).setDepth(4);
     this.boss.setCollideWorldBounds(false);
-    this.boss.bossHP     = 3;
+    // Each return is tougher: +1 HP, +10 speed (capped), throws sooner. Boss #1 is the original.
+    const n = ++this.bossNum;
+    this.boss.bossNum    = n;
+    this.boss.bossHP     = 2 + n;
     this.boss.stunned    = false;
     this.boss.dir        = fromLeft ? 1 : -1;
-    this.boss.speed      = 60;
+    this.boss.speed      = Math.min(100, 50 + n * 10);
     this.boss.lastThrow  = this.time.now;
     this.boss.throwDelay = 2000;
     this.boss.setFlipX(this.boss.dir < 0);
@@ -2286,7 +2292,7 @@ class GameScene extends Phaser.Scene {
     });
 
     SFX.sitesDown();
-    const alert = this.add.text(C.WIDTH / 2, C.HEIGHT / 2 - 40, '⚠ BOSS INCOMING ⚠', {
+    const alert = this.add.text(C.WIDTH / 2, C.HEIGHT / 2 - 40, n === 1 ? '⚠ BOSS INCOMING ⚠' : `⚠ BOSS IS BACK ×${n} ⚠`, {
       fontFamily: 'industry, Arial Black, sans-serif', fontSize: '28px',
       color: '#FF4444', stroke: '#000', strokeThickness: 5
     }).setOrigin(0.5).setDepth(50);
@@ -2305,7 +2311,7 @@ class GameScene extends Phaser.Scene {
       onComplete: () => {
         if (!this.boss || !this.boss.active) return;
         if (this.boss.bossHP <= 0) {
-          this.addScore(2000, this.boss.x, this.boss.y - 30);
+          this.addScore(2000 * this.boss.bossNum, this.boss.x, this.boss.y - 30);
           this.doSplat(this.boss.x, this.boss.y);
           this.boss.destroy();
           this.boss = null;
@@ -2342,7 +2348,8 @@ class GameScene extends Phaser.Scene {
     const onScreen = this.boss.x >= 0 && this.boss.x <= C.WIDTH;
     if (onScreen && time - this.boss.lastThrow > this.boss.throwDelay) {
       this.boss.lastThrow  = time;
-      this.boss.throwDelay = Phaser.Math.Between(1800, 3000);
+      const faster = (this.boss.bossNum - 1) * 200;
+      this.boss.throwDelay = Phaser.Math.Between(Math.max(1000, 1800 - faster), Math.max(1600, 3000 - faster));
       this.throwBossKeyboard(this.boss);
     }
 
