@@ -87,6 +87,9 @@ const C = {
   SPAWN_RATE_BASE: 3000,   // ms between enemy spawns (decreases over time)
   FAN_THRESHOLD:   1000,   // score points to charge the fan
   FAN_WIND:        0.75,   // projectile speed multiplier while the fan is spinning
+  FAN_SQUASH:      0.30,   // vertical squash of the blade sweep — how tilted the fan looks
+  FAN_HIT_RX:      170,    // poop-hits-fan ellipse, sized to the visible sweep plus margin
+  FAN_HIT_RY:      70,
 
   // One shared palette for every texture, each ramp dark to light. INK doubles as the outline colour.
   PAL: {
@@ -990,62 +993,81 @@ class BootScene extends Phaser.Scene {
 
   makeFanTextures() {
 
-    // ── FAN HUB (28x28) — motor housing seen face on: bright outer rim, charcoal body,
-    // light centre cap with an ink core. Lit from the top-left, so only the bottom-right arc
-    // is ink: against the dark ceiling a full ink outline would take the silhouette with it.
+    // ── FAN MOTOR (30x32) — the drive seen from the side, not face on, because the fan now hangs
+    // in perspective: silver collar at the top, black shroud carrying the yellow mark, yellow
+    // gearbox, then the hub the blade arms bolt to. Lit from the left like everything else.
     {
-      const KEY = { '.': null, k: P.INK, n: P.GREY_1, m: P.GREY_2, G: P.GREY_3, g: P.GREY_4, l: P.GREY_5 };
-      const S = 28, CEN = 13.5;
+      const KEY = { '.': null, k: P.INK, n: P.GREY_1, m: P.GREY_2, G: P.GREY_3, g: P.GREY_4, l: P.GREY_5,
+                    Y: P.YEL_L, y: P.YEL, d: P.YEL_D };
+      const W = 30, CEN = 15;
+      // One row of a centred body: [lit edge, fill, shade, ink edge] across its width.
+      const band = (hw, c) => {
+        let s = '';
+        for (let x = 0; x < W; x++) {
+          const t = (x - CEN + 0.5 + hw) / (2 * hw);
+          s += (t < 0 || t > 1) ? '.' : t < 0.16 ? c[0] : t < 0.62 ? c[1] : t < 0.88 ? c[2] : c[3];
+        }
+        return s;
+      };
+      const SILVER = ['l', 'g', 'G', 'k'], BLACK = ['n', 'k', 'k', 'k'], GOLD = ['Y', 'y', 'd', 'k'];
+      // Half-width per row, top to bottom. The shroud's corners round off rather than sitting
+      // square, and the gearbox tapers into the hub so the blade arms come away cleanly.
+      const SHAPE = [
+        [4, SILVER], [4, SILVER], [4, SILVER], [6, SILVER],                 // 0-3   collar, flange
+        [6, BLACK], [8, BLACK],                                             // 4-5   shroud shoulder
+        [9, BLACK], [9, BLACK], [9, BLACK], [9, BLACK], [9, BLACK],         // 6-15  shroud body
+        [9, BLACK], [9, BLACK], [9, BLACK], [9, BLACK], [9, BLACK],
+        [8, BLACK], [6, BLACK],                                             // 16-17 shroud foot
+        [6, GOLD], [6, GOLD], [5, GOLD], [4, GOLD],                         // 18-21 gearbox
+        [4, SILVER], [3, SILVER],                                           // 22-23 hub
+      ];
+      const rows = SHAPE.map(([hw, c]) => band(hw, c));
+      // The bull mark on the shroud, the one bright thing on an otherwise black body.
+      const patch = (r, col, s) => { rows[r] = rows[r].slice(0, col) + s + rows[r].slice(col + s.length); };
+      patch(8,  12, '.dyyd.');
+      patch(9,  11, 'dyYYYYyd');
+      patch(10, 11, 'dyYYYYyd');
+      patch(11, 12, '.dyyd.');
+      patch(12, 13, '.dd.');
+      const g = this.make.graphics({ add: false });
+      paintGrid(g, rows, KEY);
+      g.generateTexture('fan_motor', W, 24);
+      g.destroy();
+    }
+
+    // ── FAN BLADE (76x14) — one Powerfoil arm drawn pointing right from a pivot at its left
+    // edge, so the rig can rotate it. Bright aluminium extrusion, a small yellow winglet part way
+    // out and the broad yellow tip winglet, as on the real fan. The profile is computed rather
+    // than written out as rows: it is a smooth taper, and 14 rows of 76 characters by hand is a
+    // worse way to describe a curve.
+    {
+      const KEY = { '.': null, k: P.INK, G: P.GREY_3, g: P.GREY_4, l: P.GREY_5, w: P.GREY_6,
+                    Y: P.YEL_L, y: P.YEL, d: P.YEL_D };
+      const W = 76, H = 14, CEN = 6.5;
+      // Half-height and colour family per column: arm, airfoil, mid winglet, airfoil, tip winglet.
+      // Mostly aluminium: the yellow is two small accents, as on the real blade, not a paint job.
+      const profile = x =>
+        x < 12 ? { h: 1.8, c: 'al' } :
+        x < 46 ? { h: 2.4 + (x - 12) * 0.02, c: 'al' } :
+        x < 52 ? { h: 3.6, c: 'yl' } :
+        x < 64 ? { h: 3.0, c: 'al' } :
+        x < 73 ? { h: 4.8, c: 'yl' } :
+                 { h: 3.0, c: 'yl' };
+      const BAND = { al: ['w', 'l', 'g', 'k'], yl: ['Y', 'y', 'd', 'k'] };
       const rows = [];
-      for (let y = 0; y < S; y++) {
+      for (let y = 0; y < H; y++) {
         let row = '';
-        for (let x = 0; x < S; x++) {
-          const dx = x - CEN, dy = y - CEN;
-          const d = Math.hypot(dx, dy);
-          const lit = dx + dy < 0;
-          row +=
-            d > 13.4 ? '.' :
-            d > 12.0 ? (lit ? 'l' : 'k') :   // outer edge
-            d > 10.2 ? (lit ? 'g' : 'G') :   // bright rim
-            d >  9.0 ? 'k' :                 // groove
-            d >  4.2 ? (lit ? 'm' : 'n') :   // charcoal body
-            d >  3.0 ? 'k' :                 // cap outline
-            d >  1.4 ? (lit ? 'l' : 'g') :   // centre cap
-                       'k';                  // axle core
+        for (let x = 0; x < W; x++) {
+          const p = profile(x), dy = y - CEN;
+          if (Math.abs(dy) > p.h) { row += '.'; continue; }
+          const b = BAND[p.c], t = (dy + p.h) / (2 * p.h);   // 0 lit top edge, 1 shaded underside
+          row += t < 0.24 ? b[0] : t < 0.56 ? b[1] : t < 0.82 ? b[2] : b[3];
         }
         rows.push(row);
       }
       const g = this.make.graphics({ add: false });
       paintGrid(g, rows, KEY);
-      g.generateTexture('fan_hub', 28, 28);
-      g.destroy();
-    }
-
-    // ── FAN BLADE (76x9) — seen face on: mounting arm cols 2-11, charcoal airfoil cols 12-60,
-    // yellow tip cols 61-73. Light shade on the top edge, ink underneath, because against the
-    // dark ceiling the top edge is what draws the silhouette.
-    {
-      const KEY = {
-        '.': null, k: P.INK, m: P.GREY_2, G: P.GREY_3, g: P.GREY_4, l: P.GREY_5,
-        Y: P.YEL_L, y: P.YEL, d: P.YEL_D,
-      };
-      const gap = n => '.'.repeat(n);
-      const arm = c => c.repeat(10);   // cols 2-11
-      const bod = c => c.repeat(49);   // cols 12-60
-      const tip = c => c.repeat(13);   // cols 61-73
-      const g = this.make.graphics({ add: false });
-      paintGrid(g, [
-        gap(20) + 'l'.repeat(41) + 'Y'.repeat(10) + gap(5),          // 0 top edge, tapered both ends
-        gap(12) + 'l'.repeat(8) + 'g'.repeat(41) + tip('y') + gap(2), // 1
-        gap(12) + bod('g') + tip('y') + gap(2),                       // 2
-        '..' + arm('l') + bod('g') + tip('y') + gap(2),               // 3 arm top
-        '..' + arm('g') + bod('G') + tip('y') + gap(2),               // 4
-        '..' + arm('G') + bod('G') + tip('y') + gap(2),               // 5
-        '..' + arm('k') + bod('m') + tip('d') + gap(2),               // 6 arm underside
-        gap(12) + 'k'.repeat(8) + 'm'.repeat(41) + tip('d') + gap(2), // 7
-        gap(20) + 'k'.repeat(51) + gap(5),                            // 8 bottom edge
-      ], KEY);
-      g.generateTexture('fan_blade', 76, 9);
+      g.generateTexture('fan_blade', W, H);
       g.destroy();
     }
 
@@ -1077,15 +1099,11 @@ class BootScene extends Phaser.Scene {
         LIP + gap(36) + COLLAR + '.' + gap(36) + LIP,   // 8 turned-down ends and rod collar
         LIP + gap(36) + COLLAR + '.' + gap(36) + LIP,   // 9
         'k'.repeat(8) + gap(36) + 'k'.repeat(11) + '.' + gap(36) + 'k'.repeat(8),  // 10
-        gap(46) + ROD + gap(46),      // 11 drop rod
-        gap(46) + ROD + gap(46),      // 12
-        gap(46) + ROD + gap(46),      // 13
-        gap(46) + ROD + gap(46),      // 14
-        gap(46) + ROD + gap(46),      // 15
-        gap(46) + ROD + gap(46),      // 16
-        gap(46) + ROD + gap(46),      // 17
+        // Rows 11-25: drop tube. Long enough to reach the motor, which hangs lower now that the
+        // blades sweep in perspective and need clearance under the ceiling deck.
+        ...Array.from({ length: 15 }, () => gap(46) + ROD + gap(46)),
       ], KEY);
-      g.generateTexture('fan_mount', 100, 18);
+      g.generateTexture('fan_mount', 100, 26);
       g.destroy();
     }
   }
@@ -1780,27 +1798,32 @@ class GameScene extends Phaser.Scene {
   // ─────────────────────────────────────────────────────────
   setupFan() {
     const cx = C.WIDTH / 2;
-    const cy = 32;  // hub center y
+    const cy = 52;  // hub center y — low enough that the blade sweep clears the ceiling deck
 
-    // Ceiling mount bracket
+    // Ceiling mount bracket and drop tube
     this.add.image(cx, 0, 'fan_mount').setOrigin(0.5, 0).setScale(2).setDepth(2);
 
-    // Fan blades: each placed at hub center, origin at left edge so rotation pivots there.
-    // Set initial angle at spawn so all 6 are visible before spinning starts.
+    // The blades live in a container squashed on Y. Phaser folds the parent transform into every
+    // child, so a blade rotating inside it traces an ellipse and foreshortens on its own, with no
+    // per-blade projection maths: the tips pass low at the front and high at the back, and a blade
+    // never points at the floor the way a face-on wheel does. The squashed cross-section is right
+    // rather than a side effect — a real ceiling fan seen from below does thin out at the sides.
     const NUM_BLADES = 8;
+    this.fanRig = this.add.container(cx, cy).setScale(2, 2 * C.FAN_SQUASH).setDepth(3);
     this.fanBladeImages = [];
     this.fanAngle = 0;
     for (let i = 0; i < NUM_BLADES; i++) {
-      const blade = this.add.image(cx, cy, 'fan_blade')
-        .setOrigin(0, 0.5)
-        .setScale(2)
-        .setDepth(3);
+      // Local (0,0): the container carries position and scale. Origin at the left edge so the
+      // blade pivots about the hub.
+      const blade = this.add.image(0, 0, 'fan_blade').setOrigin(0, 0.5);
       blade.angle = (i / NUM_BLADES) * 360;  // set after creation so origin pivot is applied
+      this.fanRig.add(blade);
       this.fanBladeImages.push(blade);
     }
 
-    // Hub drawn on top of blades
-    this.fanHubImg = this.add.image(cx, cy, 'fan_hub').setScale(2).setDepth(5);
+    // Motor drawn on top of the blade roots. Anchored by its foot so the shroud stands above the
+    // blade plane and only the gearbox straddles it, the way it hangs on the real fan.
+    this.fanHubImg = this.add.image(cx, cy + 6, 'fan_motor').setOrigin(0.5, 1).setScale(2).setDepth(5);
 
     // Fan state
     this.fanCX         = cx;
@@ -1827,9 +1850,11 @@ class GameScene extends Phaser.Scene {
     if (this.fanSpinning && !this.fanTriggered) {
       this.poops.getChildren().forEach(poop => {
         if (!poop.active || this.fanTriggered) return;
-        const dx = poop.x - this.fanCX;
-        const dy = poop.y - this.fanCY;
-        if (Math.sqrt(dx*dx + dy*dy) < 130) {
+        // Ellipse, not a circle: the blades sweep a squashed disc now, so a circular test would
+        // fire on empty air above and below the fan and miss the tips out at the sides.
+        const dx = (poop.x - this.fanCX) / C.FAN_HIT_RX;
+        const dy = (poop.y - this.fanCY) / C.FAN_HIT_RY;
+        if (dx*dx + dy*dy < 1) {
           this.fanTriggered = true;
           this.nukeAllEnemies();
           this.triggerFanSpread(poop.x, poop.y);
@@ -1885,7 +1910,7 @@ class GameScene extends Phaser.Scene {
                                       // break the arcs they were already solved for
     SFX.fanRevUp();
     this.tweens.addCounter({
-      from: 0, to: 14, duration: 1200,
+      from: 0, to: 8, duration: 1600,
       onUpdate: (tween) => { this.fanSpeed = tween.getValue(); }
     });
   }
