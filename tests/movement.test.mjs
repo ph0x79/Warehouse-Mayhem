@@ -1,5 +1,5 @@
 // Throwers and the boss roam back and forth without stopping next to the player or leaving the
-// screen, and the boss jumps for a player above him only when no shelf is overhead (issue #5).
+// screen, and the boss jumps up through shelves and drops down through them (issue #5).
 import assert from 'node:assert/strict';
 import { launch, openGame } from './lib.mjs';
 
@@ -31,25 +31,32 @@ try {
   const turned = await guardX();
   assert.ok(turned !== null && turned > 40, `guard walking into the left edge turns back (x ${turned})`);
 
-  // Boss: player up on a shelf. In the open gap at x 355 he jumps; under a shelf at x 160 he doesn't.
-  const bossJumps = (x) => page.evaluate(async (x) => {
+  // Boss standing still under the left shelf unit (lowest shelf top 444). With the player above he
+  // jumps up through the shelf and lands on it; with the player below he drops back to the floor.
+  const bossBottom = (playerY) => page.evaluate(async (playerY) => {
+    const g = window.__game.scene.getScene('Game');
+    const b = g.boss;
+    Object.assign(b, { speed: 0, nextJump: 0, throwDelay: 1e9 });
+    for (let i = 0; i < 90; i++) {                 // ~1.5s, player pinned so gravity can't move it
+      g.player.x = 480; g.player.y = playerY;
+      b.x = 160;
+      if (!b.body.blocked.down) b.nextJump = Infinity;   // one move only
+      await new Promise(r => setTimeout(r, 16));
+    }
+    return Math.round(b.body.bottom);
+  }, playerY);
+  await page.evaluate(async () => {
     const g = window.__game.scene.getScene('Game');
     if (g.boss) { g.boss.destroy(); g.boss = null; }
     g.spawnBoss();
-    Object.assign(g.boss, { speed: 0, nextJump: Infinity });
-    g.boss.x = x;
-    g.player.y = 200;
+    Object.assign(g.boss, { speed: 0, nextJump: Infinity, x: 160 });
     await new Promise(r => setTimeout(r, 1200));   // settle on the floor
-    g.boss.nextJump = 0;
-    let minVy = 0;
-    for (let i = 0; i < 20; i++) { minVy = Math.min(minVy, g.boss.body.velocity.y); await new Promise(r => setTimeout(r, 16)); }
-    return minVy < -300;
-  }, x);
-  assert.equal(await bossJumps(355), true, 'boss in the open jumps for a player above');
-  assert.equal(await bossJumps(160), false, 'boss under a shelf does not jump');
+  });
+  assert.equal(await bossBottom(100), 444, 'boss jumps up through a shelf and lands on it');
+  assert.equal(await bossBottom(560), 576, 'boss drops through his shelf to a player below');
 
   assert.deepEqual(errors, [], 'page errors');
-  console.log('PASS movement: throwers roam past the player and turn at edges, boss jumps only with headroom');
+  console.log('PASS movement: throwers roam past the player and turn at edges, boss jumps up and drops down through shelves');
 } finally {
   await browser.close();
 }

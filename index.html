@@ -2353,7 +2353,13 @@ class GameScene extends Phaser.Scene {
     this.boss.dirUntil   = this.time.now + 2000;
     this.boss.nextJump   = this.time.now + 2000;
     this.boss.setFlipX(this.boss.dir < 0);
-    this.physics.add.collider(this.boss, this.platforms);
+    // Shelves are one-way for him: he jumps up through them and lands only when he was above the
+    // shelf last frame, and drops through while dropUntil is ahead. The floor always holds.
+    this.boss.dropUntil = 0;
+    this.physics.add.collider(this.boss, this.platforms, null, (boss, plat) =>
+      plat.body.top >= C.HEIGHT - 64 ||
+      (boss.body.velocity.y >= 0 && this.time.now > boss.dropUntil &&
+       boss.body.prev.y + boss.body.height <= plat.body.top + 4));
 
     // Sprite first: Phaser passes (sprite, groupChild) whichever order the args
     // are given, so (poops, boss) handed the boss in as `poop` and destroyed it.
@@ -2420,18 +2426,13 @@ class GameScene extends Phaser.Scene {
     b.setVelocityX((b.body.blocked.down ? move : b.dir * 2.5) * currentSpeed);
     move ? b.anims.resume() : b.anims.pause();
 
-    // Every 2–4s on solid ground he may jump: always when the player is above him, otherwise now
-    // and then. Never with a shelf just overhead, which would only bonk him back down.
-    // The timer only restarts once he is clear of shelves, so he jumps as soon as he walks out.
+    // Every 2–4s on solid ground he may change level: drop through his shelf when the player is
+    // below, jump up when the player is above, otherwise jump now and then anyway.
     if (b.body.blocked.down && time > b.nextJump) {
-      const top  = b.body.top;
-      const roof = this.platforms.getChildren().some(p =>
-        Math.abs(p.x - b.x) < p.body.halfWidth + b.body.halfWidth &&
-        p.body.bottom <= top && p.body.bottom > top - 200);
-      if (!roof) {
-        b.nextJump = time + Phaser.Math.Between(2000, 4000);
-        if (this.player.y < b.y - 60 || Math.random() < 0.3) b.setVelocityY(-560);
-      }
+      b.nextJump = time + Phaser.Math.Between(2000, 4000);
+      const onShelf = b.body.bottom < C.HEIGHT - 70;
+      if (onShelf && this.player.y > b.y + 60)                   b.dropUntil = time + 250;
+      else if (this.player.y < b.y - 60 || Math.random() < 0.3) b.setVelocityY(-560);
     }
 
     const onScreen = this.boss.x >= 0 && this.boss.x <= C.WIDTH;
