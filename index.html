@@ -423,71 +423,80 @@ class BootScene extends Phaser.Scene {
   }
 
   makePoopTextures() {
-    const POOP_BR  = P.BROWN_1;
-    const POOP_L   = P.BROWN_2;
-    const POOP_D   = P.BROWN_0;
-
-    // ── Flying poop projectile (10x10)
+    // ── Flying poop projectile (10x10) — three-tier swirl with a pointed tip
     {
+      const KEY = { '.': null, k: P.INK, h: P.BROWN_3, b: P.BROWN_2, d: P.BROWN_1, D: P.BROWN_0 };
       const g = this.make.graphics({ add: false });
-      // Round swirl shape
-      px(g, POOP_D,  3, 0, 4, 2);
-      px(g, POOP_BR, 2, 1, 6, 2);
-      px(g, POOP_L,  2, 1, 2, 1);  // highlight
-      px(g, POOP_BR, 1, 3, 8, 3);
-      px(g, POOP_L,  2, 3, 2, 1);
-      px(g, POOP_D,  1, 6, 8, 1);
-      px(g, POOP_BR, 0, 7, 10,2);
-      px(g, POOP_D,  0, 9, 10,1);
-      // Stink lines
-      px(g, POOP_D,  4, 0, 1, 1);
-      px(g, POOP_D,  7, 0, 1, 1);
+      paintGrid(g, [
+        '...kkkk...',
+        '...khbk...',
+        '..khhbdk..',
+        '.khhbbbdk.',
+        '.kbbbbbdk.',
+        '.kdddddDk.',
+        'khhbbbbddk',
+        'khbbbbbDDk',
+        'kddddddDDk',
+        '.kkkkkkkk.',
+      ], KEY);
       g.generateTexture('poop', 10, 10);
       g.destroy();
     }
 
-    // ── Splat (16x12) — flat splatter on ground/wall
+    // ── Splat (16x12) — wide lopsided mass with flung specks, left where a shot lands
     {
+      const KEY = { '.': null, k: P.INK, h: P.BROWN_3, b: P.BROWN_2, d: P.BROWN_1 };
       const g = this.make.graphics({ add: false });
-      px(g, POOP_BR, 4,  2, 8,  2);
-      px(g, POOP_BR, 2,  4, 12, 4);
-      px(g, POOP_L,  3,  4, 4,  2);  // highlight blob
-      px(g, POOP_BR, 4,  8, 8,  2);
-      px(g, POOP_D,  3,  9, 10, 2);
-      // Splat drops
-      px(g, POOP_BR, 0,  5, 2, 2);
-      px(g, POOP_BR, 14, 5, 2, 2);
-      px(g, POOP_BR, 6,  0, 2, 2);
-      px(g, POOP_BR, 6, 10, 2, 2);
+      paintGrid(g, [
+        '.......b........',
+        '......bb........',
+        '.b...........b..',
+        '.....kkkkkk.....',
+        '..kkkhhbbbbkk...',
+        '.khhhbbbbbbbdkk.',
+        'khhbbbbbbbbbbddk',
+        'khbbbbbbbbbbbddk',
+        'kbbbbbbbbbbbdddk',
+        '.kbbbbbbbbbddk..',
+        '..kkdddddddkk...',
+        '.b..kkkkkkk..b..',
+      ], KEY);
       g.generateTexture('splat', 16, 12);
       g.destroy();
     }
 
-    // ── Reticle (20x20) — crosshair cursor
+    // ── Reticle (20x20) — four outlined arms with a gap, so the centre dot never hides the aim point
     {
+      const KEY = { '.': null, k: P.INK, r: P.RED_L, R: P.RED };
       const g = this.make.graphics({ add: false });
-      const RC = P.RED_L;
-      const RD = P.RED;
-      // Outer ring
-      px(g, RC, 6,  0, 8, 2);
-      px(g, RC, 6, 18, 8, 2);
-      px(g, RC, 0,  6, 2, 8);
-      px(g, RC,18,  6, 2, 8);
-      // Corner ticks
-      px(g, RD, 4,  4, 3, 2);  px(g, RD, 4, 4, 2, 3);
-      px(g, RD,13,  4, 3, 2);  px(g, RD,14, 4, 2, 3);
-      px(g, RD, 4, 14, 3, 2);  px(g, RD, 4,13, 2, 3);
-      px(g, RD,13, 14, 3, 2);  px(g, RD,14,13, 2, 3);
-      // Center dot
-      px(g, RC, 9,  9, 2, 2);
+      paintGrid(g, [
+        '........kkkk........',
+        '........krRk........',
+        '........krRk........',
+        '........krRk........',
+        '........krRk........',
+        '........krRk........',
+        '........kkkk........',
+        '....................',
+        'kkkkkkk......kkkkkkk',
+        'krrrrrk..rr..krrrrrk',
+        'kRRRRRk..RR..kRRRRRk',
+        'kkkkkkk......kkkkkkk',
+        '....................',
+        '........kkkk........',
+        '........krRk........',
+        '........krRk........',
+        '........krRk........',
+        '........krRk........',
+        '........krRk........',
+        '........kkkk........',
+      ], KEY);
       g.generateTexture('reticle', 20, 20);
       g.destroy();
     }
   }
 
   makeEnemyTextures() {
-
-    const WHITE = P.WHITE;   // still used by the clipboard texture below
 
     // ── SHARED HUMAN GRIDS — 16x34: rows 0-4 hat, 5-13 face, 14-23 torso, 24-31 legs, 32-33 empty.
     // The planted foot's lowest pixel is row 31. Generic chars let each role recolour one grid:
@@ -698,76 +707,136 @@ class BootScene extends Phaser.Scene {
         frameRate:6, repeat:-1 });
     }
 
-    // ── FORKLIFT — tall side profile (32x48), mast extends high enough to threaten shelves
+    // ── FORKLIFT (32x48) — side profile facing left: fork and mast at the left, open roll cage
+    // over the seat, yellow body on two black tyres. The bottom row sits on the floor line.
+    // Cols 0-5 fork, 6-11 mast, 12-31 body.
     {
+      const KEY = {
+        '.': null, k: P.INK,
+        n: P.GREY_1, m: P.GREY_2, G: P.GREY_3, g: P.GREY_4, l: P.GREY_5,
+        Y: P.YEL_L, y: P.YEL, d: P.YEL_D, D: P.YEL_DD, C: P.CREAM,
+      };
+      const gap = n => '.'.repeat(n);
+      const MAST = 'klggmk';          // ink, bright rail, body, shade, ink
+      const HEEL = '...kgm';          // fork heel hugging the mast
+      const WHEEL = [
+        '..kkkkk..',
+        '.knnnnnk.',
+        'knnnnnnnk',
+        'knnggmnnk',
+        'knngygnnk',
+        'knnggmnnk',
+        'knnnnnnnk',
+        '.knnnnnk.',
+        '..kkkkk..',
+      ];
+      const axle = i => WHEEL[i] + '.' + WHEEL[i] + '.';   // front wheel cols 12-20, rear 22-30
+
+      const rows = [
+        gap(6) + 'kkkkkk' + gap(20),                     // 0  mast cap
+        gap(6) + MAST + gap(20),                         // 1
+        gap(6) + MAST + '..' + 'k'.repeat(16) + '..',    // 2  cage roof
+        gap(6) + MAST + '..k' + 'Y'.repeat(14) + 'k..',  // 3
+        gap(6) + MAST + '..k' + 'd'.repeat(14) + 'k..',  // 4
+        gap(6) + MAST + '..kyk' + gap(10) + 'kdk..',     // 5  cage posts
+        gap(6) + MAST + '..kyk' + gap(10) + 'kdk..',     // 6
+        gap(6) + MAST + '..kyk' + gap(10) + 'kdk..',     // 7
+        gap(6) + MAST + '..kyk' + gap(10) + 'kdk..',     // 8
+        gap(6) + MAST + '..kyk' + gap(10) + 'kdk..',     // 9
+        gap(6) + MAST + '..kyk' + gap(10) + 'kdk..',     // 10
+        gap(6) + MAST + '..kyk' + gap(10) + 'kdk..',     // 11
+        gap(6) + MAST + '..kyk' + gap(5) + 'kkkkkkdk..', // 12 seat back top
+        gap(6) + MAST + '..kyk' + gap(5) + 'kmmnkkdk..', // 13
+        gap(6) + MAST + '..kyk' + gap(5) + 'kmmnkkdk..', // 14
+        gap(6) + MAST + '..kyk' + gap(5) + 'kmmnkkdk..', // 15
+        gap(6) + MAST + '..kyk.kGmkkmmnkkdk..',          // 16 steering wheel
+        gap(6) + MAST + '..kyk..kGkkmmnkkdk..',          // 17
+        gap(6) + MAST + '..kyk..kGkkmmnkkdk..',          // 18
+        gap(6) + MAST + '..kyk..kGkkmmnkkdk..',          // 19
+        gap(6) + MAST + '..kyk..kGkkmmnkkdk..',          // 20
+        gap(6) + MAST + '..kyk..kGkkmmnkkdk..',          // 21
+        gap(6) + MAST + '..kyk..kmmmmmnkkdk..',          // 22 seat cushion
+        gap(6) + MAST + '..kyk..knnnnnnkkdk..',          // 23
+        gap(6) + MAST + 'k' + 'Y'.repeat(17) + 'k.',     // 24 deck, chamfered rear corner
+        gap(6) + MAST + 'k' + 'y'.repeat(18) + 'k',      // 25
+        gap(6) + MAST + 'kCC' + 'y'.repeat(15) + 'dk',   // 26 headlight
+        gap(6) + MAST + 'kCC' + 'y'.repeat(15) + 'dk',   // 27
+        gap(6) + MAST + 'kkkk' + 'y'.repeat(13) + 'ddk', // 28 lamp underline
+        gap(6) + MAST + 'k' + 'y'.repeat(16) + 'ddk',    // 29
+        gap(6) + MAST + 'kmmm' + 'y'.repeat(13) + 'ddk', // 30 grille
+        gap(6) + MAST + 'knnn' + 'y'.repeat(13) + 'ddk', // 31
+        gap(6) + MAST + 'kmmm' + 'y'.repeat(13) + 'ddk', // 32
+        gap(6) + MAST + 'knnn' + 'y'.repeat(13) + 'ddk', // 33
+        gap(6) + MAST + 'k' + 'y'.repeat(16) + 'ddk',    // 34
+        gap(6) + MAST + 'k' + 'D'.repeat(18) + 'k',      // 35 hazard band
+        HEEL + MAST + 'k' + 'd'.repeat(18) + 'k',        // 36 fork heel starts
+        HEEL + MAST + 'k' + 'd'.repeat(18) + 'k',        // 37
+        HEEL + MAST + 'k'.repeat(20),                    // 38 chassis underside
+        HEEL + MAST + axle(0),                           // 39
+        HEEL + MAST + axle(1),                           // 40
+        HEEL + MAST + axle(2),                           // 41
+        HEEL + MAST + axle(3),                           // 42
+        'kkkkgm' + MAST + axle(4),                       // 43 fork tine top
+        'kggggg' + MAST + axle(5),                       // 44
+        'kGGGGG' + MAST + axle(6),                       // 45
+        'kkkkkk' + 'kkkkkk' + axle(7),                   // 46 fork and mast base
+        gap(12) + axle(8),                               // 47 ground line
+      ];
+      for (const y of [7, 15, 23, 31]) rows[y] = patch(rows[y], 6, 'kllllk');  // mast rungs
+      rows[29] = patch(rows[29], 0, '...kkk');                                 // ink cap over the carriage
+      for (let y = 30; y <= 35; y++) rows[y] = patch(rows[y], 0, HEEL);        // carriage rides higher
+
       const g = this.make.graphics({ add: false });
-      const YL  = P.YEL; const YD = P.YEL_D; const YS = P.YEL_L;
-      const GRY = P.GREY_4; const GD  = P.GREY_3; const BLK = P.INK;
-      const WIN = P.SKY;
-
-      // ── MAST (vertical rails, left side) — runs full height
-      px(g, GD,   0,  0,  3, 48);
-      px(g, GRY,  1,  0,  1, 48);
-      px(g, GD,   5,  0,  3, 48);
-      for (let y = 4; y < 44; y += 10) { px(g, GD, 0, y, 8, 2); }
-      // Forks
-      px(g, GRY,  0, 40,  8, 3);
-      px(g, GD,   0, 40,  8, 1);
-      px(g, GRY,  0, 44,  8, 3);
-      px(g, GD,   0, 44,  8, 1);
-
-      // ── BODY / CAB
-      px(g, YL,   8, 18, 24, 22);
-      px(g, YS,   8, 18, 24,  3);
-      px(g, YD,   8, 38, 24,  2);
-      px(g, YD,  29, 18,  3, 22);
-      px(g, YL,   8, 10, 20,  10);
-      px(g, YS,   8, 10, 20,   2);
-      px(g, YD,   8, 18, 20,   2);
-
-      // Windshield
-      px(g, WIN,  10, 12, 12,  6);
-      px(g, P.SKY_L, 10, 12, 4, 2);
-
-      // Roll cage
-      px(g, GD,   8, 10,  2, 10);
-      px(g, GD,  26, 10,  2, 10);
-
-      // Exhaust pipe
-      px(g, GD,  25,  6,  3, 10);
-      px(g, BLK, 25,  6,  3,  2);
-
-      // ── WHEELS
-      px(g, BLK,  8, 38,  8, 10);
-      px(g, GRY,  9, 39,  6,  8);
-      px(g, BLK, 24, 38,  8, 10);
-      px(g, GRY, 25, 39,  6,  8);
-      px(g, YD,  11, 41,  2,  4);
-      px(g, YD,  27, 41,  2,  4);
-
+      paintGrid(g, rows, KEY);
       g.generateTexture('forklift', 32, 48);
       g.destroy();
     }
 
-    // ── DART (tranquilizer) — tiny needle
+    // ── DART (tranquilizer) — flies right: blue flight, pale shaft, red wedge tip
     {
+      const KEY = {
+        '.': null, k: P.INK,
+        f: P.SKY, F: P.BLUE,
+        c: P.CREAM, C: P.GREY_5,
+        r: P.RED_L, R: P.RED,
+      };
       const g = this.make.graphics({ add: false });
-      px(g, P.CREAM,  0, 2, 10, 2);  // shaft
-      px(g, P.RED_L, 10, 1,  3, 4);  // tip
-      px(g, P.SKY,    0, 2,  3, 2);  // flight
+      paintGrid(g, [
+        'kffk..........',
+        'kfFkkkkkkkrRk.',
+        'kffkcccccrrRRk',
+        'kfFkcCCCCrRRRk',
+        'kfFkkkkkkkRRk.',
+        'kffk..........',
+      ], KEY);
       g.generateTexture('dart', 14, 6);
       g.destroy();
     }
 
-    // ── CLIPBOARD — thrown by manager
+    // ── CLIPBOARD — thrown by the manager: tan board, lined paper, grey clip
     {
+      const KEY = {
+        '.': null, k: P.INK,
+        t: P.TAN, T: P.TAN_D,
+        w: P.WHITE, l: P.GREY_4,
+        g: P.GREY_5, G: P.GREY_4,
+      };
       const g = this.make.graphics({ add: false });
-      px(g, P.TAN,  0,  0, 10, 13);
-      px(g, WHITE,     1,  2,  8,  9);
-      px(g, P.GREY_3,  2,  3,  6,  1);
-      px(g, P.GREY_3,  2,  5,  6,  1);
-      px(g, P.GREY_3,  2,  7,  6,  1);
-      px(g, P.GREY_5,  3,  0,  4,  2);  // clip
+      paintGrid(g, [
+        '...kggk...',
+        'kkkkGGkkkk',
+        'ktwwGGwwtk',
+        'ktwwwwwwtk',
+        'ktwllllwtk',
+        'ktwwwwwwtk',
+        'ktwllllwtk',
+        'ktwwwwwwtk',
+        'ktwlllwwtk',
+        'ktwwwwwwtk',
+        'ktwwwwwwtk',
+        'ktTTTTTTtk',
+        'kkkkkkkkkk',
+      ], KEY);
       g.generateTexture('clipboard', 10, 13);
       g.destroy();
     }
@@ -872,18 +941,19 @@ class BootScene extends Phaser.Scene {
         frameRate:5, repeat:-1 });
     }
 
-    // ── KEYBOARD — thrown by boss
+    // ── KEYBOARD — thrown by the boss: dark body, two rows of keys, spacebar below
     {
+      const KEY = { '.': null, k: P.INK, b: P.GREY_2, w: P.GREY_6, W: P.GREY_4 };
       const g = this.make.graphics({ add: false });
-      px(g, P.GREY_3,  0, 0, 14, 7);
-      px(g, P.GREY_2,  0, 6, 14, 1);
-      px(g, P.GREY_4,  1, 1,  2, 2);
-      px(g, P.GREY_4,  4, 1,  2, 2);
-      px(g, P.GREY_4,  7, 1,  2, 2);
-      px(g, P.GREY_4, 10, 1,  2, 2);
-      px(g, P.GREY_4,  2, 4,  2, 2);
-      px(g, P.GREY_4,  6, 4,  3, 2);
-      px(g, P.GREY_4, 10, 4,  2, 2);
+      paintGrid(g, [
+        'kkkkkkkkkkkkkk',
+        'kwwbwwbwwbwwbk',
+        'kWWbWWbWWbWWbk',
+        'kbbbbbbbbbbbbk',
+        'kwwbwwwwwwbwwk',
+        'kWWbWWWWWWbWWk',
+        'kkkkkkkkkkkkkk',
+      ], KEY);
       g.generateTexture('keyboard', 14, 7);
       g.destroy();
     }
@@ -894,89 +964,101 @@ class BootScene extends Phaser.Scene {
 
   makeFanTextures() {
 
-    // ── FAN HUB — larger, industrial motor housing (28x28) matching Powerfoil X4 scale
+    // ── FAN HUB (28x28) — motor housing seen face on: bright outer rim, charcoal body,
+    // light centre cap with an ink core. Lit from the top-left, so only the bottom-right arc
+    // is ink: against the dark ceiling a full ink outline would take the silhouette with it.
     {
-      const g = this.make.graphics({ add: false });
-      const HUB  = P.GREY_2;  // dark charcoal body
-      const HUB_L = P.GREY_4; // highlight rim
-      const HUB_D = P.GREY_1; // shadow
-      const RIM   = P.GREY_3;
-      // Outer body
-      px(g, HUB,   2,  2, 24, 24);
-      // Rim highlight (top-left)
-      px(g, HUB_L, 2,  2, 24,  3);
-      px(g, HUB_L, 2,  2,  3, 24);
-      // Shadow (bottom-right)
-      px(g, HUB_D, 2, 23, 24,  3);
-      px(g, HUB_D,23,  2,  3, 24);
-      // Inner ring (blade attachment ring)
-      px(g, RIM,   6,  6, 16, 16);
-      px(g, HUB_L, 6,  6, 16,  2);
-      px(g, HUB_D, 6, 20, 16,  2);
-      // Center axle boss
-      px(g, HUB_D, 10, 10,  8,  8);
-      px(g, HUB_L, 11, 10,  4,  2);
-      px(g, P.INK, 12, 12,  4,  4);  // axle hole
-      // Attachment bolt holes (4 cardinal)
-      for (const [bx,by] of [[6,13],[20,13],[13,6],[13,20]]) {
-        px(g, HUB_D, bx, by, 2, 2);
+      const KEY = { '.': null, k: P.INK, n: P.GREY_1, m: P.GREY_2, G: P.GREY_3, g: P.GREY_4, l: P.GREY_5 };
+      const S = 28, CEN = 13.5;
+      const rows = [];
+      for (let y = 0; y < S; y++) {
+        let row = '';
+        for (let x = 0; x < S; x++) {
+          const dx = x - CEN, dy = y - CEN;
+          const d = Math.hypot(dx, dy);
+          const lit = dx + dy < 0;
+          row +=
+            d > 13.4 ? '.' :
+            d > 12.0 ? (lit ? 'l' : 'k') :   // outer edge
+            d > 10.2 ? (lit ? 'g' : 'G') :   // bright rim
+            d >  9.0 ? 'k' :                 // groove
+            d >  4.2 ? (lit ? 'm' : 'n') :   // charcoal body
+            d >  3.0 ? 'k' :                 // cap outline
+            d >  1.4 ? (lit ? 'l' : 'g') :   // centre cap
+                       'k';                  // axle core
+        }
+        rows.push(row);
       }
+      const g = this.make.graphics({ add: false });
+      paintGrid(g, rows, KEY);
       g.generateTexture('fan_hub', 28, 28);
       g.destroy();
     }
 
-    // ── FAN BLADE — Powerfoil X4 airfoil shape, native 76x9, displayed at uniform 2x (152x18)
-    // Structure: [arm 10px][airfoil body 54px][yellow tip 12px]
+    // ── FAN BLADE (76x9) — seen face on: mounting arm cols 2-11, charcoal airfoil cols 12-60,
+    // yellow tip cols 61-73. Light shade on the top edge, ink underneath, because against the
+    // dark ceiling the top edge is what draws the silhouette.
     {
+      const KEY = {
+        '.': null, k: P.INK, m: P.GREY_2, G: P.GREY_3, g: P.GREY_4, l: P.GREY_5,
+        Y: P.YEL_L, y: P.YEL, d: P.YEL_D,
+      };
+      const gap = n => '.'.repeat(n);
+      const arm = c => c.repeat(10);   // cols 2-11
+      const bod = c => c.repeat(49);   // cols 12-60
+      const tip = c => c.repeat(13);   // cols 61-73
       const g = this.make.graphics({ add: false });
-      const ARM  = P.GREY_2;  // mounting arm — darker than blade
-      const BL   = P.GREY_3;  // charcoal blade body (Powerfoil dark gray)
-      const BL_L = P.GREY_4;  // upper surface highlight
-      const BL_D = P.GREY_1;  // lower surface shadow
-      const TIP  = P.YEL;     // Big Ass Fans yellow tip
-      const TIP_L = P.YEL_L;
-      const TIP_D = P.YEL_D;
-
-      // ── Mounting arm (root stub from hub to blade) — narrow rod
-      px(g, ARM,  0, 3, 10, 3);      // arm body center
-      px(g, P.GREY_3, 0, 3, 10, 1);  // arm top highlight
-      px(g, P.GREY_1, 0, 5, 10, 1);  // arm bottom shadow
-
-      // ── Airfoil body
-      px(g, BL,   10, 2, 54, 5);     // main airfoil slab
-      px(g, BL_L, 10, 2, 54, 1);     // upper surface highlight
-      px(g, BL_D, 10, 6, 54, 1);     // lower surface shadow
-      // Thicker root section (first 16px of airfoil)
-      px(g, BL,   10, 1, 16, 1);
-      px(g, BL,   10, 7, 16, 1);
-
-      // ── Yellow tip (last 12px)
-      px(g, TIP,  64, 2, 12, 5);
-      px(g, TIP_L,64, 2, 12, 1);     // tip highlight
-      px(g, TIP_D,64, 6, 12, 1);     // tip shadow
-
-      // Attachment bolt on arm
-      px(g, P.GREY_3, 4, 3, 3, 2);
-
+      paintGrid(g, [
+        gap(20) + 'l'.repeat(41) + 'Y'.repeat(10) + gap(5),          // 0 top edge, tapered both ends
+        gap(12) + 'l'.repeat(8) + 'g'.repeat(41) + tip('y') + gap(2), // 1
+        gap(12) + bod('g') + tip('y') + gap(2),                       // 2
+        '..' + arm('l') + bod('g') + tip('y') + gap(2),               // 3 arm top
+        '..' + arm('g') + bod('G') + tip('y') + gap(2),               // 4
+        '..' + arm('G') + bod('G') + tip('y') + gap(2),               // 5
+        '..' + arm('k') + bod('m') + tip('d') + gap(2),               // 6 arm underside
+        gap(12) + 'k'.repeat(8) + 'm'.repeat(41) + tip('d') + gap(2), // 7
+        gap(20) + 'k'.repeat(51) + gap(5),                            // 8 bottom edge
+      ], KEY);
       g.generateTexture('fan_blade', 76, 9);
       g.destroy();
     }
 
-    // ── FAN MOUNT (ceiling bracket) — wider to match larger hub
+    // ── FAN MOUNT (100x18) — ceiling bracket: bolted plate across rows 0-7, drop rod below.
+    // The bottom lip is the light shade, since that edge hangs against open dark air.
     {
+      const KEY = { '.': null, k: P.INK, n: P.GREY_1, m: P.GREY_2, G: P.GREY_3, g: P.GREY_4, l: P.GREY_5 };
+      const gap = n => '.'.repeat(n);
+      const band = c => c.repeat(100);
+      const patch = (row, col, s) => row.slice(0, col) + s + row.slice(col + s.length);
+      const bolts = (row, s) => {
+        let r = row;
+        for (let x = 6; x < 96; x += 12) r = patch(r, x, s);
+        return r;
+      };
+      const LIP    = 'lgggGmnk';      // turned-down bracket ends
+      const COLLAR = 'llgggGGGmnk';   // cols 44-54
+      const ROD    = 'lggGGmnk';      // cols 46-53
       const g = this.make.graphics({ add: false });
-      const MT = P.GREY_2; const MT_L = P.GREY_4; const MT_D = P.INK;
-      px(g, MT,   0,  0, 100, 10);
-      px(g, MT_L, 0,  0, 100,  3);
-      px(g, MT_D, 0,  8, 100,  4);
-      // Bolt holes
-      for (let x = 8; x < 100; x += 16) {
-        px(g, MT_D, x, 3, 4, 4);
-        px(g, MT_L, x+1, 4, 2, 2);
-      }
-      // Drop rod
-      px(g, MT_D, 46, 10,  8,  8);
-      px(g, MT_L, 47, 10,  3,  8);
+      paintGrid(g, [
+        band('k'),                    // 0 against the ceiling
+        band('l'),                    // 1
+        band('g'),                    // 2
+        bolts(band('G'), 'kk'),       // 3 bolt heads
+        bolts(band('m'), 'ln'),       // 4
+        band('m'),                    // 5
+        band('l'),                    // 6 light lip
+        band('k'),                    // 7
+        LIP + gap(36) + COLLAR + '.' + gap(36) + LIP,   // 8 turned-down ends and rod collar
+        LIP + gap(36) + COLLAR + '.' + gap(36) + LIP,   // 9
+        'k'.repeat(8) + gap(36) + 'k'.repeat(11) + '.' + gap(36) + 'k'.repeat(8),  // 10
+        gap(46) + ROD + gap(46),      // 11 drop rod
+        gap(46) + ROD + gap(46),      // 12
+        gap(46) + ROD + gap(46),      // 13
+        gap(46) + ROD + gap(46),      // 14
+        gap(46) + ROD + gap(46),      // 15
+        gap(46) + ROD + gap(46),      // 16
+        gap(46) + ROD + gap(46),      // 17
+      ], KEY);
       g.generateTexture('fan_mount', 100, 18);
       g.destroy();
     }
