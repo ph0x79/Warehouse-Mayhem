@@ -234,6 +234,26 @@ class BootScene extends Phaser.Scene {
       r(P.YEL_L, lx - 5, 52, 10, 2);                                 // lens
     }
 
+    // ── Overhead crane bridge: yellow box girder along the top of the wall, gapped around the
+    // fan's sweep (hub sits at grid ~240,26; FAN_HIT_RX/RY give grid x ~155-325) so it reads as
+    // its own structure rather than part of the fan. Kept below the HUD's cooldown-bar row
+    // (screen y ~58, grid ~29) and clear of the pipe band at grid y40.
+    const craneY = 30, craneH = 5;
+    for (const [gx, gw] of [[20, 128], [332, 128]]) {
+      r(P.YEL_DD, gx, craneY, gw, craneH);
+      r(P.YEL_D, gx, craneY, gw, 1);                                  // top highlight
+      r(P.INK, gx, craneY + craneH - 1, gw, 1);                       // bottom shadow
+    }
+    for (const ex of [20, 440]) {                                    // end trucks, hazard-striped
+      r(P.GREY_1, ex, craneY + craneH, 12, 3);
+      for (let i = 0; i < 3; i++) r(P.YEL_DD, ex + 1 + i * 4, craneY + craneH, 2, 3);
+    }
+    const trolleyX = 90;                                              // hoist trolley, off-centre from the fan
+    r(P.GREY_1, trolleyX, craneY + craneH, 14, 3);
+    r(P.GREY_3, trolleyX + 1, craneY + craneH + 1, 12, 1);
+    r(P.GREY_1, trolleyX + 6, craneY + craneH + 3, 2, 1);             // cable
+    r(P.GREY_3, trolleyX + 5, craneY + craneH + 4, 4, 1);             // hook
+
     // ── Pipes along the top of the wall
     r(P.GREY_1, 0, 46, 480, 1);
     r(P.GREY_3, 0, 40, 480, 5);
@@ -277,6 +297,29 @@ class BootScene extends Phaser.Scene {
     r(P.ORANGE_D, 365, 223, 1, 12);
     r(P.GREY_1, 365, 219, 4, 3);
     r(P.GREY_1, 362, 236, 10, 2);
+
+    // ── Wooden pallet stacks against the wall base, clear of the door and extinguisher
+    const pallet = (x, w) => {
+      const h = 15, yTop = 288 - h;
+      r(P.BROWN_0, x, yTop, w, h);
+      for (let i = 0; i < 3; i++) {
+        const py = yTop + i * 5;
+        r(P.BROWN_2, x, py, w, 4);
+        r(P.BROWN_3, x, py, w, 1);                                    // top edge highlight
+        for (let sx = 2; sx < w; sx += 6) r(P.BROWN_0, x + sx, py, 1, 4); // slat gaps
+      }
+    };
+    pallet(6, 26);
+    pallet(444, 26);
+
+    // ── Traffic cones at the wall base
+    const cone = (x) => {
+      r(P.ORANGE_D, x, 286, 8, 2);                                    // base
+      r(P.ORANGE, x + 1, 280, 6, 6);                                  // body
+      r(P.CREAM, x + 1, 282, 6, 1);                                   // reflective band
+      r(P.ORANGE_L, x + 3, 278, 2, 2);                                // tip
+    };
+    for (const cx of [38, 420, 432]) cone(cx);
 
     // ── Floor: polished concrete
     r(P.GREY_3, 0, 288, 480, 32);
