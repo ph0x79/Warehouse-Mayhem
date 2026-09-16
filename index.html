@@ -42,7 +42,8 @@
 <script>
   const music   = document.getElementById('bgMusic');
   const muteBtn = document.getElementById('muteBtn');
-  music.volume = 0.5;
+  // Kept well under the sound effects (0.7 to 0.9 samples, 0.12 to 0.5 synth) so they cut through.
+  music.volume = 0.2;
 
   // Storage is unavailable in some privacy modes, and this runs before the game boots.
   const readPref  = () => { try { return localStorage.getItem('wm_music'); } catch { return null; } };
