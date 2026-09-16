@@ -40,15 +40,39 @@
 </style>
 <button id="muteBtn" onclick="toggleMute()" tabindex="-1">🔇 MUSIC</button>
 <script>
-  const music = document.getElementById('bgMusic');
+  const music   = document.getElementById('bgMusic');
+  const muteBtn = document.getElementById('muteBtn');
   music.volume = 0.5;
-  music.muted = true;
+
+  // Storage is unavailable in some privacy modes, and this runs before the game boots.
+  const readPref  = () => { try { return localStorage.getItem('wm_music'); } catch { return null; } };
+  const writePref = v  => { try { localStorage.setItem('wm_music', v); } catch {} };
+
+  // Restore the saved preference. Autoplay is blocked until a user gesture, so only the flag and
+  // the label are restored here; playback starts on the first interaction below.
+  music.muted = readPref() !== 'on';
+  muteBtn.textContent = music.muted ? '🔇 MUSIC' : '🔊 MUSIC';
 
   function toggleMute() {
     music.muted = !music.muted;
-    document.getElementById('muteBtn').textContent = music.muted ? '🔇 MUSIC' : '🔊 MUSIC';
+    writePref(music.muted ? 'off' : 'on');
+    muteBtn.textContent = music.muted ? '🔇 MUSIC' : '🔊 MUSIC';
     music.play().catch(() => {});
+    // A clicked <button> keeps DOM focus, and a focused button fires on Space and Enter, so from
+    // the first click on, every Space or Enter during play toggled the music. Drop focus at once.
+    muteBtn.blur();
   }
+
+  // M is the only keyboard shortcut for music. It stands down while the initials screen is up,
+  // where M is a letter the player may want to type.
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'KeyM' && !window.__typingInitials) toggleMute();
+  });
+
+  // Saved preference was 'on': start playing as soon as a gesture allows it.
+  window.addEventListener('pointerdown', () => {
+    if (!music.muted) music.play().catch(() => {});
+  }, { once: true });
 </script>
 <script>
 // ============================================================
@@ -2402,6 +2426,11 @@ class EnterInitialsScene extends Phaser.Scene {
 
     this.input.keyboard.on('keydown', this.handleKey, this);
     if (this.sys.game.device.input.touch) this.setupTouchInitials();
+
+    // Hold off the global M music shortcut: M is a legal initial. Cleared on shutdown rather than
+    // in doSubmit, so it also clears when the scene ends some other way.
+    window.__typingInitials = true;
+    this.events.once('shutdown', () => { window.__typingInitials = false; });
   }
 
   setupTouchInitials() {
