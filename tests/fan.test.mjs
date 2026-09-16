@@ -22,14 +22,25 @@ try {
   await page.evaluate(() => window.__game.scene.getScene('Game').addScore(500, 400, 300));
   assert.equal((await fan()).charge, 1000, 'no charge accrues while the fan spins');
 
-  // Fill the screen, then set the nuke off the way a player does: put a poop on the hub and let
-  // updateFan find it. This is the reported bug — the kills the explosion scores used to land
-  // after the threshold was snapshotted, so they counted toward the next spin.
+  // The blades sweep an ellipse, so the hit test is an ellipse: a poop well below the hub is
+  // nowhere near a blade and must not set it off.
   await page.evaluate(() => {
     const g = window.__game.scene.getScene('Game');
+    g.poops.create(g.fanCX, g.fanCY + 120, 'poop');
+  });
+  await page.waitForTimeout(150);
+  assert.equal(await page.evaluate(() => window.__game.scene.getScene('Game').fanTriggered), false,
+    'a poop below the sweep does not trigger the nuke');
+
+  // Fill the screen, then set the nuke off the way a player does: hit a blade out at the tip,
+  // which is what they are aiming at. This is the reported bug — the kills the explosion scores
+  // used to land after the threshold was snapshotted, so they counted toward the next spin.
+  await page.evaluate(() => {
+    const g = window.__game.scene.getScene('Game');
+    g.poops.clear(true, true);
     ['worker', 'worker', 'guard', 'manager', 'manager'].forEach(t => g.spawnEnemy(t));
     g.__scoreBeforeNuke = g.score;
-    g.poops.create(g.fanCX, g.fanCY, 'poop');
+    g.poops.create(g.fanCX + 150, g.fanCY, 'poop');
   });
   await page.waitForTimeout(200);
   const gained = await page.evaluate(() => {
