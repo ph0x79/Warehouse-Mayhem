@@ -1,0 +1,5 @@
+{
+  "deploy": { "workflows": [], "note": "Netlify auto-deploys main on push. Confirm the live site updated: curl -s https://warehouse-mayhem.netlify.app/ | grep <a line from the change>." },
+  "codex_review": { "scope": "all" },
+  "verify_hint": "bash tests/run.sh (Playwright), curl the live site after a push to main, gh CLI"
+}
