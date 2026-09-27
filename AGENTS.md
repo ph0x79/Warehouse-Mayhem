@@ -24,9 +24,12 @@ Review rules for Warehouse Mayhem. The block below is managed by claude-ops. Rep
 A test earns its place by failing when the behavior it names breaks. Each of these is a **P1**:
 
 - **A behavior change with no test that fails without it.** A refactor, config or copy change is exempt, and the PR says which one it is. Judge it from the diff: would the changed test still pass against the code before this change? If yes, it does not test the change. (The author's machine checks the same thing with devloop's `test-proof.sh`; its result is not in the PR.)
-- **A test changed so it passes instead of the code being fixed:** an assertion deleted or loosened, an expected value re-recorded to match new output, a skip / only / todo added, a timeout raised.
-- **A test that cannot fail:** no assertion, an assertion on a mock's own setup, an error swallowed, a snapshot nobody checked.
+- **A test changed so it passes instead of the code being fixed:** an assertion deleted or loosened, an expected value re-recorded to match new output, a skip / only / todo added, a timeout raised. A `test-guard: <reason>` comment marks a deliberate one; judge the reason.
+- **A test that cannot fail:** no assertion, an assertion on a mock's own setup, an error swallowed, a snapshot nobody checked, an expected value computed by the code under test.
 - **A test that depends on something it does not control:** wall-clock time, the network, test order, unseeded randomness.
+- **A test pinned to implementation, not behavior:** it asserts private members, source text or SQL strings, call counts on our own code, a constant equal to its own literal, a tuning number, a pixel size or an asset path. It breaks on a refactor and never on a bug.
+- **A mock or fake of something we own:** our modules, our database, or the unit under test. A fake that re-implements the logic it replaces tests the fake. Mock only what we do not control: third-party HTTP, email and payment providers, the clock, randomness.
+- **A test of the framework or library** (Zod accepting its own enum, the ORM saving a row, a Godot Timer firing), or **one that repeats an existing test** instead of extending or parametrizing it. "The source must never contain X" is a lint rule, not a test.
 
 Skip coverage-percentage and test-naming comments.
 
