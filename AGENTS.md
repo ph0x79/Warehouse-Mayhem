@@ -19,6 +19,15 @@ Review rules for Warehouse Mayhem. The block below is managed by claude-ops. Rep
 - **Signal density.** More than ~3–5 distinct findings usually means the diff is too large to review well. Say so once at the top, then still report every P0/P1 you can cite.
 - **A repeat finding is a rules bug — fix the rule in the same PR.** If a P0/P1 finding is already covered by a rule in `CLAUDE.md`, `.claude/rules/*.md`, or this file, the rule failed to prevent it: sharpen it (wording, a missing `paths:` glob so it actually loads, a tripwire that belongs inline) alongside the code fix. If nothing covers it but this repo has seen it before (`git log --grep`, an earlier PR thread, `.git/devloop/codex-reviews/*.json` locally), promote it to a rule in the same PR. Write the principle, not the instance; at most one rule edit per PR; `.github/workflows/*` stays write-locked for bots. The weekly rule-improver is the backstop for what slips past this, not a substitute for it.
 
+## Errors
+
+A failure the code hides is a bug nobody will see. Each of these is a **P1** in app code, hooks and scripts alike:
+
+- **An error turned into a normal-looking value:** a catch, `except`, `.catch(() => …)`, `|| true` or `2>/dev/null` that returns null, `[]`, `''`, `0` or a default without logging it, where the caller treats that value as real data ("no resume", "no open PRs").
+- **A result never checked:** a write, flush, rename, HTTP `res.ok`, exit status or affected-row count ignored before the code moves on or reports success.
+- **A silent cap or truncation:** a page limit, size cap or `LIMIT` that drops data without a log line or a signal to the caller.
+- **A crashed check reported as a pass.** A gate, hook or audit that cannot run its check must not return the same result as a clean pass. It may still let the work continue, but it says "not checked" at that moment, through a visible warning or a non-success status, and records the failure. Logging alone is enough only for code that enforces nothing. A comment saying it fails open does not make a silent pass acceptable.
+
 ## Tests
 
 A test earns its place by failing when the behavior it names breaks. Each of these is a **P1**:
