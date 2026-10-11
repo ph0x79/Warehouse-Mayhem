@@ -25,7 +25,7 @@ A failure the code hides is a bug nobody will see. Each of these is a **P1** in 
 
 - **An error turned into a normal-looking value:** a catch, `except`, `.catch(() => …)`, `|| true` or `2>/dev/null` that returns null, `[]`, `''`, `0` or a default without logging it, where the caller treats that value as real data ("no resume", "no open PRs").
 - **A result never checked:** a write, flush, rename, HTTP `res.ok`, exit status or affected-row count ignored before the code moves on or reports success.
-- **A silent cap or truncation:** a page limit, size cap or `LIMIT` that drops data without a log line or a signal to the caller.
+- **A silent cap or truncation:** a page limit, size cap or `LIMIT` that drops data without a log line or a signal to the caller. A code comment naming the cap, a `ponytail:` note included, is not that signal.
 - **A crashed check reported as a pass.** A gate, hook or audit that cannot run its check must not return the same result as a clean pass. It may still let the work continue, but it says "not checked" at that moment, through a visible warning or a non-success status, and records the failure. Logging alone is enough only for code that enforces nothing. A comment saying it fails open does not make a silent pass acceptable.
 
 ## Tests
