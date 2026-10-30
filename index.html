@@ -144,12 +144,13 @@ async function submitScore(initials, score) {
   } catch { return false; }
 }
 
+// null means the board could not be read, so callers can say so instead of showing it empty.
 async function fetchTopScores() {
   try {
     const res = await fetch('/.netlify/functions/get-scores');
-    if (!res.ok) return [];
+    if (!res.ok) return null;
     return await res.json();
-  } catch { return []; }
+  } catch { return null; }
 }
 
 // ============================================================
@@ -2233,9 +2234,9 @@ class GameScene extends Phaser.Scene {
     this.forklifts.getChildren().forEach(f => f.setVelocity(0, 0));
     if (this.boss && this.boss.active) { this.boss.setVelocity(0, 0); }
     this.time.delayedCall(1200, async () => {
-      // Only prompt for initials when the score actually makes the top 10.
+      // Only prompt for initials when the score actually makes the top 10, and the board is up.
       const scores = await fetchTopScores();
-      const qualifies = this.score > 0 && (scores.length < 10 || this.score > scores[scores.length - 1].score);
+      const qualifies = scores && this.score > 0 && (scores.length < 10 || this.score > scores[scores.length - 1].score);
       if (qualifies) this.scene.start('EnterInitials', { score: this.score });
       else this.scene.start('GameOver', { score: this.score, initials: '' });
     });
@@ -2525,6 +2526,13 @@ class GameOverScene extends Phaser.Scene {
       fontFamily: 'industry, Arial Black, sans-serif', fontSize: '32px', color: '#FFC425',
       stroke: '#000', strokeThickness: 4
     }).setOrigin(0.5);
+    // A failed save must not show the player a row the server never stored.
+    const own = data.saved === false ? '' : initials;
+    if (data.saved === false) {
+      this.add.text(W/2, 150, 'SCORE NOT SAVED', {
+        fontFamily: 'industry, Arial Black, sans-serif', fontSize: '14px', color: '#FF4444'
+      }).setOrigin(0.5);
+    }
 
     this.add.text(W/2, 175, 'HIGH SCORES', {
       fontFamily: 'industry, Arial Black, sans-serif', fontSize: '22px', color: '#FFFFFF',
@@ -2536,12 +2544,13 @@ class GameOverScene extends Phaser.Scene {
 
     fetchTopScores().then(scores => {
       if (!this.scene.isActive('GameOver')) return;
+      if (!scores) { boardMsg.setText('LEADERBOARD OFFLINE'); return; }
       // get-scores is cached for 30s, so the score just submitted can be missing: add it locally if it qualifies.
-      let mine = initials ? scores.findIndex(s => s.initials === initials && s.score === score) : -1;
-      if (initials && mine < 0 && (scores.length < 10 || score > scores[scores.length - 1].score)) {
+      let mine = own ? scores.findIndex(s => s.initials === own && s.score === score) : -1;
+      if (own && mine < 0 && (scores.length < 10 || score > scores[scores.length - 1].score)) {
         mine = scores.findIndex(s => s.score < score);
         if (mine < 0) mine = scores.length;
-        scores.splice(mine, 0, { initials, score });
+        scores.splice(mine, 0, { initials: own, score });
         scores.length = Math.min(scores.length, 10);
       }
       if (scores.length === 0) { boardMsg.setText('NO SCORES YET'); return; }
@@ -2733,9 +2742,9 @@ class EnterInitialsScene extends Phaser.Scene {
       fontFamily: 'industry, Arial Black, sans-serif', fontSize: '16px', color: '#888888'
     }).setOrigin(0.5);
 
-    submitScore(initials, this.finalScore).then(() => {
+    submitScore(initials, this.finalScore).then(saved => {
       this.time.delayedCall(400, () => {
-        this.scene.start('GameOver', { score: this.finalScore, initials });
+        this.scene.start('GameOver', { score: this.finalScore, initials, saved });
       });
     });
   }
@@ -2845,8 +2854,8 @@ class TitleScene extends Phaser.Scene {
       if (!this.scene.isActive('Title')) return;
       loadingTxt.destroy();
 
-      if (scores.length === 0) {
-        this.add.text(rc, 200, 'NO SCORES YET', {
+      if (!scores || scores.length === 0) {
+        this.add.text(rc, 200, scores ? 'NO SCORES YET' : 'LEADERBOARD OFFLINE', {
           fontFamily: 'industry, Arial Black, sans-serif',
           fontSize: '14px', color: '#242424'
         }).setOrigin(0.5);
