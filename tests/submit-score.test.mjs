@@ -27,10 +27,13 @@ test('rejects each bad submission before touching the database', async () => {
     ['initials not a string', post({ initials: 123, score: 10 }), 400, /initials/],
     ['initials blank after trim', post({ initials: '   ', score: 10 }), 400, /initials/],
     ['initials over 3 chars', post({ initials: 'ABCD', score: 10 }), 400, /initials/],
+    ['initials punctuation', post({ initials: 'A!?', score: 10 }), 400, /initials/],
+    ['initials emoji', post({ initials: '😀', score: 10 }), 400, /initials/],
+    ['initials with a space inside', post({ initials: 'A B', score: 10 }), 400, /initials/],
     ['score not a number', post({ initials: 'ABC', score: '10' }), 400, /score/],
     ['score not an integer', post({ initials: 'ABC', score: 1.5 }), 400, /score/],
     ['score negative', post({ initials: 'ABC', score: -1 }), 400, /score/],
-    ['score over max', post({ initials: 'ABC', score: 100_000_000 }), 400, /score/],
+    ['score over max', post({ initials: 'ABC', score: 6_600_001 }), 400, /score/],
   ];
   for (const [name, req, status, error] of bad) {
     const res = await handler(req);
@@ -42,10 +45,10 @@ test('rejects each bad submission before touching the database', async () => {
 
 test('accepts a good score and stores trimmed, upper-cased initials', async () => {
   inserts.length = 0;
-  const res = await handler(post({ initials: ' abc ', score: 99_999_999 }));
+  const res = await handler(post({ initials: ' abc ', score: 6_600_000 }));
   assert.equal(res.status, 201);
   assert.deepEqual(await res.json(), { ok: true });
-  assert.deepEqual(inserts, [['ABC', 99_999_999]]);
+  assert.deepEqual(inserts, [['ABC', 6_600_000]]);
 });
 
 test('returns 500 when the database call fails', async t => {
