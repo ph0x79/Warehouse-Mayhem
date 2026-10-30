@@ -2232,9 +2232,10 @@ class GameScene extends Phaser.Scene {
     this.forklifts.getChildren().forEach(f => f.setVelocity(0, 0));
     if (this.boss && this.boss.active) { this.boss.setVelocity(0, 0); }
     this.time.delayedCall(1200, async () => {
-      // Only prompt for initials when the score actually makes the top 10, and the board is up.
+      // Only prompt for initials when the score makes the top 10. Board unreadable: let the player
+      // try to save anyway, since submit-score reports its own failure (SCORE NOT SAVED).
       const scores = await fetchTopScores();
-      const qualifies = scores && this.score > 0 && (scores.length < 10 || this.score > scores[scores.length - 1].score);
+      const qualifies = this.score > 0 && (!scores || scores.length < 10 || this.score > scores[scores.length - 1].score);
       if (qualifies) this.scene.start('EnterInitials', { score: this.score });
       else this.scene.start('GameOver', { score: this.score, initials: '' });
     });

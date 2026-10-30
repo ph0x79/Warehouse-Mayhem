@@ -79,13 +79,18 @@ try {
   assert.deepEqual(highlighted(rows), [], 'failed save is not highlighted');
   assert.ok(!rows.some(([t]) => t.includes('WJF')), 'failed save is not inserted locally');
 
-  // With the board down, a big score skips the initials prompt and the board says it is offline.
+  // With the board down, a big score still gets the initials prompt; when the submit fails too,
+  // GameOver says the score was not saved and the board is offline.
   boardDown = true;
-  assert.ok(!(await sceneAfterGameOver(9999)).includes('EnterInitials'), 'board down: no initials prompt');
+  assert.ok((await sceneAfterGameOver(9999)).includes('EnterInitials'), 'board down: initials prompt still shown');
+  for (const k of ['W', 'J', 'F', 'Enter']) await page.keyboard.press(k);
+  await page.waitForFunction(() => window.__game.scene.isActive('GameOver'), null, { timeout: 5000 });
+  await page.waitForTimeout(800);
+  assert.ok((await texts()).includes('SCORE NOT SAVED'), 'board and submit down: failed save is reported');
   assert.ok((await texts()).includes('LEADERBOARD OFFLINE'), 'board down: offline shown, not an empty board');
 
   assert.deepEqual(errors, [], 'page errors');
-  console.log('PASS gameover: top 10 always shown, own row highlighted, initials only when qualifying, failures shown');
+  console.log('PASS gameover: top 10 always shown, own row highlighted, initials when qualifying or board down, failures shown');
 } finally {
   await browser.close();
 }
