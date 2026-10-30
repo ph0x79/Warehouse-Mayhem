@@ -1,6 +1,10 @@
 import { neon } from '@neondatabase/serverless';
 
-export default async function handler(req, context) {
+// Ceiling on what one hour of perfect play can score (derivation in the commit that set it):
+// at most 2000/1.5 pts/s from throws plus 500 pts/s from fan nukes, times 3600 s.
+const MAX_SCORE = 6_600_000;
+
+export default async function handler(req) {
   if (req.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 });
   }
@@ -15,16 +19,18 @@ export default async function handler(req, context) {
     });
   }
 
-  const { initials, score } = body;
+  const { initials, score } = body ?? {};
+  const name = typeof initials === 'string' ? initials.trim().toUpperCase() : '';
 
-  if (typeof initials !== 'string' || initials.trim().length === 0 || initials.trim().length > 3) {
-    return new Response(JSON.stringify({ error: 'initials must be 1–3 characters' }), {
+  // The game's initials entry only offers A-Z, so anything else did not come from it.
+  if (!/^[A-Z]{1,3}$/.test(name)) {
+    return new Response(JSON.stringify({ error: 'initials must be 1–3 letters A–Z' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
-  if (typeof score !== 'number' || !Number.isInteger(score) || score < 0 || score > 99_999_999) {
+  if (typeof score !== 'number' || !Number.isInteger(score) || score < 0 || score > MAX_SCORE) {
     return new Response(JSON.stringify({ error: 'score must be a non-negative integer' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
@@ -33,7 +39,7 @@ export default async function handler(req, context) {
 
   try {
     const sql = neon(process.env.NETLIFY_DATABASE_URL);
-    await sql`INSERT INTO scores (initials, score) VALUES (${initials.trim().toUpperCase()}, ${score})`;
+    await sql`INSERT INTO scores (initials, score) VALUES (${name}, ${score})`;
     return new Response(JSON.stringify({ ok: true }), {
       status: 201,
       headers: { 'Content-Type': 'application/json' },

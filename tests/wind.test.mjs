@@ -57,6 +57,24 @@ try {
   assert.equal(await page.evaluate(() => window.__game.scene.getScene('Game').fanWind), 1,
     'wind clears once the fan spins down');
 
+  // Spin-down runs on elapsed time, not frames: two 120 Hz frames slow the fan as much as one 60 Hz frame.
+  const spunDown = await page.evaluate(() => {
+    const g = window.__game.scene.getScene('Game');
+    g.scene.pause();
+    const after = steps => {
+      g.fanTriggered = true;
+      g.fanSpeed = 1;
+      steps.forEach(d => g.updateFan(d));
+      return g.fanSpeed;
+    };
+    const r = { hz120: after([1000 / 120, 1000 / 120]), hz60: after([1000 / 60]) };
+    g.fanSpeed = 0;
+    g.fanTriggered = false;
+    g.scene.resume();
+    return r;
+  });
+  assert.ok(Math.abs(spunDown.hz120 - spunDown.hz60) < 1e-9, `spin-down is frame-rate independent (${JSON.stringify(spunDown)})`);
+
   assert.deepEqual(errors, [], 'page errors');
   console.log('PASS wind: fan downdraft slows projectiles 25% without breaking their aim');
 } finally {

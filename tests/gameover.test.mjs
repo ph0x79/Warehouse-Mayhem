@@ -7,7 +7,13 @@ const TOP = Array.from({ length: 10 }, (_, i) => ({ initials: 'AB' + String.from
 const browser = await launch();
 try {
   const { page, errors } = await openGame(browser, { startGame: false });
-  await page.route('**/.netlify/functions/get-scores', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify(TOP) }));
+  let boardDown = false;
+  await page.route('**/.netlify/functions/get-scores', r => boardDown
+    ? r.fulfill({ status: 500, contentType: 'application/json', body: '[]' })
+    : r.fulfill({ contentType: 'application/json', body: JSON.stringify(TOP) }));
+  await page.route('**/.netlify/functions/submit-score', r => r.fulfill({ status: 500, body: '{}' }));
+  const texts = () => page.evaluate(() => window.__game.scene.getScene('GameOver').children.list
+    .filter(o => o.type === 'Text').map(o => o.text));
 
   // Starts GameOver and returns its leaderboard rows as [text, color].
   const board = async (initials, score) => {
@@ -57,8 +63,34 @@ try {
   assert.ok((await sceneAfterGameOver(50)).includes('GameOver'), 'score below 10th place skips initials');
   assert.ok((await sceneAfterGameOver(9999)).includes('EnterInitials'), 'top-10 score still prompts for initials');
 
+  // A save the server refused is not shown as saved: no local row, and the player is told.
+  await page.evaluate(() => {
+    const m = window.__game.scene;
+    m.getScenes(true).forEach(s => m.stop(s.scene.key));
+    m.start('EnterInitials', { score: 4500 });
+  });
+  await page.waitForTimeout(300);
+  for (const k of ['W', 'J', 'F', 'Enter']) await page.keyboard.press(k);
+  await page.waitForFunction(() => window.__game.scene.isActive('GameOver'), null, { timeout: 5000 });
+  await page.waitForTimeout(800);
+  assert.ok((await texts()).includes('SCORE NOT SAVED'), 'failed save is reported');
+  rows = await page.evaluate(() => window.__game.scene.getScene('GameOver').children.list
+    .filter(o => o.type === 'Text' && /^\s*\d+\.\s/.test(o.text)).map(o => [o.text, o.style.color]));
+  assert.deepEqual(highlighted(rows), [], 'failed save is not highlighted');
+  assert.ok(!rows.some(([t]) => t.includes('WJF')), 'failed save is not inserted locally');
+
+  // With the board down, a big score still gets the initials prompt; when the submit fails too,
+  // GameOver says the score was not saved and the board is offline.
+  boardDown = true;
+  assert.ok((await sceneAfterGameOver(9999)).includes('EnterInitials'), 'board down: initials prompt still shown');
+  for (const k of ['W', 'J', 'F', 'Enter']) await page.keyboard.press(k);
+  await page.waitForFunction(() => window.__game.scene.isActive('GameOver'), null, { timeout: 5000 });
+  await page.waitForTimeout(800);
+  assert.ok((await texts()).includes('SCORE NOT SAVED'), 'board and submit down: failed save is reported');
+  assert.ok((await texts()).includes('LEADERBOARD OFFLINE'), 'board down: offline shown, not an empty board');
+
   assert.deepEqual(errors, [], 'page errors');
-  console.log('PASS gameover: top 10 always shown, own row highlighted, initials only when qualifying');
+  console.log('PASS gameover: top 10 always shown, own row highlighted, initials when qualifying or board down, failures shown');
 } finally {
   await browser.close();
 }

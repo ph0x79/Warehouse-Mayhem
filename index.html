@@ -18,7 +18,7 @@
 <audio id="sfxBeepBeep" src="sounds/BEEPBEEP.wav" preload="auto" style="display:none"></audio>
 <audio id="sfxEbitda" src="sounds/EBITDA.wav" preload="auto" style="display:none"></audio>
 <audio id="sfxSitesDown" src="sounds/SITESDOWN.wav" preload="auto" style="display:none"></audio>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js" integrity="sha512-YQL0GVx/Too3vZjBl9plePRIYsRnd1s8N6QOvXPdZ+JMH2mtRTLQXGUDGjNW6zr1HUgcOIury67IvWe91oeEwQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <style>
 #muteBtn {
   position: fixed;
@@ -144,12 +144,13 @@ async function submitScore(initials, score) {
   } catch { return false; }
 }
 
+// null means the board could not be read, so callers can say so instead of showing it empty.
 async function fetchTopScores() {
   try {
     const res = await fetch('/.netlify/functions/get-scores');
-    if (!res.ok) return [];
+    if (!res.ok) return null;
     return await res.json();
-  } catch { return []; }
+  } catch { return null; }
 }
 
 // ============================================================
@@ -1085,9 +1086,6 @@ class BootScene extends Phaser.Scene {
       g.generateTexture('keyboard', 18, 9);
       g.destroy();
     }
-
-    // ── SCORE POP text textures (100, 150, 250, 500)
-    // These are handled dynamically via text objects, no texture needed
   }
 
   makeFanTextures() {
@@ -1950,7 +1948,8 @@ class GameScene extends Phaser.Scene {
     // This avoids Phaser stale-pair bugs with destroyed objects + static zones
   }
 
-  updateFan() {
+  updateFan(delta) {
+    const frames = delta / 16.67;   // per-step tuning below is per 60 Hz frame
     // Spin up if threshold crossed and not in post-nuke lockout
     const now = this.time.now;
     if (!this.fanSpinning && this.fanCharge >= C.FAN_THRESHOLD && now >= this.fanLockoutUntil) {
@@ -1976,7 +1975,7 @@ class GameScene extends Phaser.Scene {
 
     // Rotate blades by updating each blade's angle around the hub center
     if (this.fanSpeed > 0) {
-      this.fanAngle += this.fanSpeed;
+      this.fanAngle += this.fanSpeed * frames;
       const NUM = this.fanBladeImages.length;
       this.fanBladeImages.forEach((blade, i) => {
         blade.setAngle(this.fanAngle + (i / NUM) * 360);
@@ -1984,7 +1983,7 @@ class GameScene extends Phaser.Scene {
 
       // Slow down after spread fires
       if (this.fanTriggered) {
-        this.fanSpeed -= 0.1;
+        this.fanSpeed -= 0.1 * frames;
         if (this.fanSpeed <= 0) {
           this.fanSpeed      = 0;
           this.fanSpinning   = false;
@@ -2197,13 +2196,13 @@ class GameScene extends Phaser.Scene {
     const LBL_STYLE = { fontFamily:'industry, Arial Black, sans-serif', fontSize:'10px', color:'#FFFFFF', stroke:'#000', strokeThickness:2 };
 
     // Left: THROW cooldown
-    this.cdBarBg = this.add.rectangle(16, BAR_Y, BAR_W, BAR_H, 0x333333).setOrigin(0,0).setDepth(20);
+    this.add.rectangle(16, BAR_Y, BAR_W, BAR_H, 0x333333).setOrigin(0,0).setDepth(20);
     this.cdBar   = this.add.rectangle(16, BAR_Y, BAR_W, BAR_H, 0xFFC425).setOrigin(0,0).setDepth(21);
     this.add.text(16, LBL_Y, 'THROW', LBL_STYLE).setDepth(20);
 
     // Right: HEAT STRESS — right edge mirrors left bar's left edge
     const fanBarX = C.WIDTH - 16 - BAR_W;
-    this.fanBarBg = this.add.rectangle(fanBarX, BAR_Y, BAR_W, BAR_H, 0x333333).setOrigin(0,0).setDepth(20);
+    this.add.rectangle(fanBarX, BAR_Y, BAR_W, BAR_H, 0x333333).setOrigin(0,0).setDepth(20);
     this.fanBar   = this.add.rectangle(fanBarX, BAR_Y, BAR_W, BAR_H, 0xFF0000).setOrigin(0,0).setDepth(21);
     this.fanBar.setScale(0, 1);
     this.fanLabel = this.add.text(fanBarX, LBL_Y, 'HEAT STRESS 0%', LBL_STYLE).setDepth(20);
@@ -2233,9 +2232,10 @@ class GameScene extends Phaser.Scene {
     this.forklifts.getChildren().forEach(f => f.setVelocity(0, 0));
     if (this.boss && this.boss.active) { this.boss.setVelocity(0, 0); }
     this.time.delayedCall(1200, async () => {
-      // Only prompt for initials when the score actually makes the top 10.
+      // Only prompt for initials when the score makes the top 10. Board unreadable: let the player
+      // try to save anyway, since submit-score reports its own failure (SCORE NOT SAVED).
       const scores = await fetchTopScores();
-      const qualifies = this.score > 0 && (scores.length < 10 || this.score > scores[scores.length - 1].score);
+      const qualifies = this.score > 0 && (!scores || scores.length < 10 || this.score > scores[scores.length - 1].score);
       if (qualifies) this.scene.start('EnterInitials', { score: this.score });
       else this.scene.start('GameOver', { score: this.score, initials: '' });
     });
@@ -2250,13 +2250,13 @@ class GameScene extends Phaser.Scene {
 
     this.handlePlayerMovement();
     this.updateCooldownBar();
-    this.updateFan();
+    this.updateFan(delta);
     this.tickSpawning(delta);
     this.updateEnemies(time, delta);
     this.updateBoss(time);
 
     // Rotate poop
-    this.poops.getChildren().forEach(p => { p.angle += 8; });
+    this.poops.getChildren().forEach(p => { p.angle += 8 * delta / 16.67; });
     // Clean up off-screen enemies and forklifts
     this.enemies.getChildren().forEach(e => {
       if (e.x < -120 || e.x > C.WIDTH + 120) e.destroy();
@@ -2525,6 +2525,13 @@ class GameOverScene extends Phaser.Scene {
       fontFamily: 'industry, Arial Black, sans-serif', fontSize: '32px', color: '#FFC425',
       stroke: '#000', strokeThickness: 4
     }).setOrigin(0.5);
+    // A failed save must not show the player a row the server never stored.
+    const own = data.saved === false ? '' : initials;
+    if (data.saved === false) {
+      this.add.text(W/2, 150, 'SCORE NOT SAVED', {
+        fontFamily: 'industry, Arial Black, sans-serif', fontSize: '14px', color: '#FF4444'
+      }).setOrigin(0.5);
+    }
 
     this.add.text(W/2, 175, 'HIGH SCORES', {
       fontFamily: 'industry, Arial Black, sans-serif', fontSize: '22px', color: '#FFFFFF',
@@ -2536,12 +2543,13 @@ class GameOverScene extends Phaser.Scene {
 
     fetchTopScores().then(scores => {
       if (!this.scene.isActive('GameOver')) return;
+      if (!scores) { boardMsg.setText('LEADERBOARD OFFLINE'); return; }
       // get-scores is cached for 30s, so the score just submitted can be missing: add it locally if it qualifies.
-      let mine = initials ? scores.findIndex(s => s.initials === initials && s.score === score) : -1;
-      if (initials && mine < 0 && (scores.length < 10 || score > scores[scores.length - 1].score)) {
+      let mine = own ? scores.findIndex(s => s.initials === own && s.score === score) : -1;
+      if (own && mine < 0 && (scores.length < 10 || score > scores[scores.length - 1].score)) {
         mine = scores.findIndex(s => s.score < score);
         if (mine < 0) mine = scores.length;
-        scores.splice(mine, 0, { initials, score });
+        scores.splice(mine, 0, { initials: own, score });
         scores.length = Math.min(scores.length, 10);
       }
       if (scores.length === 0) { boardMsg.setText('NO SCORES YET'); return; }
@@ -2733,9 +2741,9 @@ class EnterInitialsScene extends Phaser.Scene {
       fontFamily: 'industry, Arial Black, sans-serif', fontSize: '16px', color: '#888888'
     }).setOrigin(0.5);
 
-    submitScore(initials, this.finalScore).then(() => {
+    submitScore(initials, this.finalScore).then(saved => {
       this.time.delayedCall(400, () => {
-        this.scene.start('GameOver', { score: this.finalScore, initials });
+        this.scene.start('GameOver', { score: this.finalScore, initials, saved });
       });
     });
   }
@@ -2845,8 +2853,8 @@ class TitleScene extends Phaser.Scene {
       if (!this.scene.isActive('Title')) return;
       loadingTxt.destroy();
 
-      if (scores.length === 0) {
-        this.add.text(rc, 200, 'NO SCORES YET', {
+      if (!scores || scores.length === 0) {
+        this.add.text(rc, 200, scores ? 'NO SCORES YET' : 'LEADERBOARD OFFLINE', {
           fontFamily: 'industry, Arial Black, sans-serif',
           fontSize: '14px', color: '#242424'
         }).setOrigin(0.5);

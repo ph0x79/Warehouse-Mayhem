@@ -1,6 +1,7 @@
 [build]
-  publish = "."
-  command = ""
+  # Publish only the game, so repo files (AGENTS.md, schema.sql, tests/) are not served.
+  publish = "dist"
+  command = "rm -rf dist && mkdir dist && cp -R index.html images music sounds dist/"
 
 [functions]
   directory = "netlify/functions"
