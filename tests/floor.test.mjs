@@ -38,6 +38,8 @@ try {
     assert.ok(Math.abs(r.bottom - floorTop) <= 1, `${r.name} bottom ${r.bottom}, floor ${floorTop}`);
   }
 
+  // test-guard: the pixel-size baseline (floor-baseline.json) was dropped in #28: it pinned sprite
+  // sizes, failed on every intended art change, and caught nothing the floor checks above miss.
   // The worker role picks one of three outfits at random, so the spawn above only checks whichever
   // one came up. They have to stay the same size as each other or floor placement turns flaky.
   const variants = await page.evaluate(() => ['worker', 'worker_b', 'worker_c'].map(k => {
