@@ -23,6 +23,7 @@ test('rejects each bad submission before touching the database', async () => {
   const bad = [
     ['GET', new Request('http://x/'), 405, /Method Not Allowed/],
     ['invalid JSON', post('{not json'), 400, /Invalid JSON/],
+    ['null body', post('null'), 400, /initials/],
     ['initials not a string', post({ initials: 123, score: 10 }), 400, /initials/],
     ['initials blank after trim', post({ initials: '   ', score: 10 }), 400, /initials/],
     ['initials over 3 chars', post({ initials: 'ABCD', score: 10 }), 400, /initials/],

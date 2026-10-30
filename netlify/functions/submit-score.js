@@ -15,7 +15,7 @@ export default async function handler(req, context) {
     });
   }
 
-  const { initials, score } = body;
+  const { initials, score } = body ?? {};
 
   if (typeof initials !== 'string' || initials.trim().length === 0 || initials.trim().length > 3) {
     return new Response(JSON.stringify({ error: 'initials must be 1–3 characters' }), {
