@@ -4,7 +4,7 @@ import { neon } from '@neondatabase/serverless';
 // at most 2000/1.5 pts/s from throws plus 500 pts/s from fan nukes, times 3600 s.
 const MAX_SCORE = 6_600_000;
 
-export default async function handler(req, context) {
+export default async function handler(req) {
   if (req.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 });
   }

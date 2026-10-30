@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 
-export default async function handler(req, context) {
+export default async function handler(req) {
   if (req.method !== 'GET') {
     return new Response('Method Not Allowed', { status: 405 });
   }

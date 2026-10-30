@@ -1086,9 +1086,6 @@ class BootScene extends Phaser.Scene {
       g.generateTexture('keyboard', 18, 9);
       g.destroy();
     }
-
-    // ── SCORE POP text textures (100, 150, 250, 500)
-    // These are handled dynamically via text objects, no texture needed
   }
 
   makeFanTextures() {
@@ -2199,13 +2196,13 @@ class GameScene extends Phaser.Scene {
     const LBL_STYLE = { fontFamily:'industry, Arial Black, sans-serif', fontSize:'10px', color:'#FFFFFF', stroke:'#000', strokeThickness:2 };
 
     // Left: THROW cooldown
-    this.cdBarBg = this.add.rectangle(16, BAR_Y, BAR_W, BAR_H, 0x333333).setOrigin(0,0).setDepth(20);
+    this.add.rectangle(16, BAR_Y, BAR_W, BAR_H, 0x333333).setOrigin(0,0).setDepth(20);
     this.cdBar   = this.add.rectangle(16, BAR_Y, BAR_W, BAR_H, 0xFFC425).setOrigin(0,0).setDepth(21);
     this.add.text(16, LBL_Y, 'THROW', LBL_STYLE).setDepth(20);
 
     // Right: HEAT STRESS — right edge mirrors left bar's left edge
     const fanBarX = C.WIDTH - 16 - BAR_W;
-    this.fanBarBg = this.add.rectangle(fanBarX, BAR_Y, BAR_W, BAR_H, 0x333333).setOrigin(0,0).setDepth(20);
+    this.add.rectangle(fanBarX, BAR_Y, BAR_W, BAR_H, 0x333333).setOrigin(0,0).setDepth(20);
     this.fanBar   = this.add.rectangle(fanBarX, BAR_Y, BAR_W, BAR_H, 0xFF0000).setOrigin(0,0).setDepth(21);
     this.fanBar.setScale(0, 1);
     this.fanLabel = this.add.text(fanBarX, LBL_Y, 'HEAT STRESS 0%', LBL_STYLE).setDepth(20);
