@@ -1951,7 +1951,8 @@ class GameScene extends Phaser.Scene {
     // This avoids Phaser stale-pair bugs with destroyed objects + static zones
   }
 
-  updateFan() {
+  updateFan(delta) {
+    const frames = delta / 16.67;   // per-step tuning below is per 60 Hz frame
     // Spin up if threshold crossed and not in post-nuke lockout
     const now = this.time.now;
     if (!this.fanSpinning && this.fanCharge >= C.FAN_THRESHOLD && now >= this.fanLockoutUntil) {
@@ -1977,7 +1978,7 @@ class GameScene extends Phaser.Scene {
 
     // Rotate blades by updating each blade's angle around the hub center
     if (this.fanSpeed > 0) {
-      this.fanAngle += this.fanSpeed;
+      this.fanAngle += this.fanSpeed * frames;
       const NUM = this.fanBladeImages.length;
       this.fanBladeImages.forEach((blade, i) => {
         blade.setAngle(this.fanAngle + (i / NUM) * 360);
@@ -1985,7 +1986,7 @@ class GameScene extends Phaser.Scene {
 
       // Slow down after spread fires
       if (this.fanTriggered) {
-        this.fanSpeed -= 0.1;
+        this.fanSpeed -= 0.1 * frames;
         if (this.fanSpeed <= 0) {
           this.fanSpeed      = 0;
           this.fanSpinning   = false;
@@ -2251,13 +2252,13 @@ class GameScene extends Phaser.Scene {
 
     this.handlePlayerMovement();
     this.updateCooldownBar();
-    this.updateFan();
+    this.updateFan(delta);
     this.tickSpawning(delta);
     this.updateEnemies(time, delta);
     this.updateBoss(time);
 
     // Rotate poop
-    this.poops.getChildren().forEach(p => { p.angle += 8; });
+    this.poops.getChildren().forEach(p => { p.angle += 8 * delta / 16.67; });
     // Clean up off-screen enemies and forklifts
     this.enemies.getChildren().forEach(e => {
       if (e.x < -120 || e.x > C.WIDTH + 120) e.destroy();
