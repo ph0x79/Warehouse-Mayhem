@@ -39,6 +39,24 @@ try {
   assert.equal(vx.length, 1, 'Space throws one poop');
   assert.ok(vx[0] > 0, `aimed right at the guard (vx ${vx[0]})`);
 
+  // A guard walking away is hit: Space leads him to where he will be when the poop lands.
+  // From x 330 the floor is clear to the right; the spawn point is restored after for the fan checks.
+  await guardsAt(600);
+  const spawn = await page.evaluate(() => {
+    const g = window.__game.scene.getScene('Game');
+    const e = g.enemies.getChildren()[0];
+    Object.assign(e, { speed: 130, dir: 1, dirUntil: Infinity, pace: 1, paceUntil: Infinity });
+    const at = { x: g.player.x, y: g.player.y };
+    g.player.body.reset(330, 536);
+    return at;
+  });
+  assert.ok(await until(page, () => window.__game.scene.getScene('Game').enemies.getChildren()[0].body.velocity.x > 0),
+    'the guard walks right');
+  await spaceThrow();
+  assert.ok(await until(page, () => window.__game.scene.getScene('Game').enemies.getChildren()[0]?.stunned),
+    'walking guard: Space leads him and hits');
+  await page.evaluate(({ x, y }) => window.__game.scene.getScene('Game').player.body.reset(x, y), spawn);
+
   await guardsAt(40, 900);
   vx = await spaceThrow();
   assert.ok(vx.length === 1 && vx[0] < 0, `aimed at the nearer guard, on the left (vx ${vx})`);
