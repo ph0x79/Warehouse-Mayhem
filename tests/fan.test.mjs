@@ -1,7 +1,7 @@
 // The fan charges only on points earned while it is idle and out of cooldown. Points the nuke
 // itself awards, and anything scored during the 10s lockout, must not count toward the next spin.
 import assert from 'node:assert/strict';
-import { launch, openGame } from './lib.mjs';
+import { launch, openGame, until } from './lib.mjs';
 
 const browser = await launch();
 try {
@@ -55,7 +55,7 @@ try {
   assert.equal(f.locked, true, 'nuke starts the cooldown');
 
   // Spin-down clears the bank. It finishes well inside the 10s lockout.
-  await page.waitForTimeout(3500);
+  await until(page, () => !window.__game.scene.getScene('Game').fanSpinning);
   f = await fan();
   assert.equal(f.spinning, false, 'fan has spun down');
   assert.equal(f.charge, 0, 'spin-down clears the charge');

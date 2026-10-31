@@ -1,0 +1,29 @@
+# Runs tests/run.sh (plain-Node submit-score checks, then the headless Chromium checks) on every PR
+# and on main. Netlify deploys main on push and its build image has no Chromium, so this is the
+# check that runs before a deploy: merge only on green.
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+      - run: npm ci
+        working-directory: tests
+      - run: npx playwright install --with-deps chromium-headless-shell
+        working-directory: tests
+      - run: bash tests/run.sh

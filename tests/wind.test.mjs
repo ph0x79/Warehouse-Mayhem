@@ -2,7 +2,7 @@
 // speed, so a slowed shot still lands on the target — that is what makes it safe to slow the
 // player's own poop, which is the one throw that has to reach the fan.
 import assert from 'node:assert/strict';
-import { launch, openGame } from './lib.mjs';
+import { launch, openGame, until } from './lib.mjs';
 
 const browser = await launch();
 try {
@@ -53,7 +53,7 @@ try {
     g.fanTriggered = true;
     g.fanSpeed = 0.05;
   });
-  await page.waitForTimeout(300);
+  await until(page, () => window.__game.scene.getScene('Game').fanWind === 1);
   assert.equal(await page.evaluate(() => window.__game.scene.getScene('Game').fanWind), 1,
     'wind clears once the fan spins down');
 

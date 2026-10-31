@@ -1,6 +1,6 @@
 // Game over always shows the top 10, and highlights the player's row when the score qualifies.
 import assert from 'node:assert/strict';
-import { launch, openGame } from './lib.mjs';
+import { launch, openGame, until } from './lib.mjs';
 
 const TOP = Array.from({ length: 10 }, (_, i) => ({ initials: 'AB' + String.fromCharCode(65 + i), score: 5000 - i * 400 }));
 
@@ -50,13 +50,13 @@ try {
       m.getScenes(true).forEach(s => m.stop(s.scene.key));
       m.start('Game');
     }, score);
-    await page.waitForTimeout(1000);
+    await until(page, () => window.__game.scene.isActive('Game'));
     await page.evaluate(score => {
       const g = window.__game.scene.getScene('Game');
       g.score = score;
       g.triggerGameOver();
     }, score);
-    await page.waitForTimeout(2500);
+    await until(page, () => ['GameOver', 'EnterInitials'].some(k => window.__game.scene.isActive(k)));
     return page.evaluate(() => window.__game.scene.getScenes(true).map(s => s.scene.key));
   };
 
