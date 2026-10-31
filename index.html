@@ -2115,7 +2115,45 @@ class GameScene extends Phaser.Scene {
       }
       if (ptr.leftButtonDown() || ptr.wasTouch) this.throwPoop(ptr.x, ptr.y);
     });
+    // Space throws for keyboard-only players (jump is W/Up, so it is free). addKey captures it,
+    // so the page does not scroll.
+    this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE)
+      .on('down', () => this.throwAtAutoTarget());
     this.input.keyboard.on('keydown-ESC', () => this.togglePause());
+  }
+
+  // Keyboard throw. Priority: the fan hub while it can still be nuked (that clears the screen),
+  // then the nearest on-screen enemy or boss. The first of those with a clear arc wins; with none
+  // clear, the first anyway, as a click there would. Nothing to aim at, no throw.
+  throwAtAutoTarget() {
+    const { x, y } = this.player;
+    const dist = t => Phaser.Math.Distance.Between(x, y, t.x, t.y);
+    const targets = this.enemies.getChildren().filter(e => e.active && !e.stunned);
+    if (this.boss && this.boss.active && !this.boss.stunned) targets.push(this.boss);
+    const order = targets.filter(t => t.x >= 0 && t.x <= C.WIDTH).sort((a, b) => dist(a) - dist(b));
+    if (this.fanSpinning && !this.fanTriggered) order.unshift({ x: this.fanCX, y: this.fanCY });
+    const pick = order.find(t => this.clearShot(t.x, t.y)) || order[0];
+    if (pick) this.throwPoop(pick.x, pick.y);
+  }
+
+  // Samples the arc lob() would fly from the player to (tx,ty): false if it leaves the top of the
+  // world or the poop's body would touch a shelf or pallet, where it splats before arriving.
+  // Samples every ~4 px, and each block is grown by the poop's half-size (20 px body at scale 2).
+  clearShot(tx, ty) {
+    const ox = this.player.x, oy = this.player.y - 10, spd = C.POOP_SPEED * this.fanWind;
+    const dx = tx - ox, dy = ty - oy, d = Math.sqrt(dx*dx + dy*dy);
+    if (d === 0) return true;
+    const T = d / spd, vx = (dx/d) * spd, vy = (dy/d) * spd - 0.5 * C.GRAVITY * T;
+    const R = 10;
+    const blocks = [...this.platforms.getChildren(), ...this.pallets.getChildren()].map(b => b.body);
+    // The arc's apex can rise well above the straight line, so size the steps on both legs.
+    const n = Math.ceil((d + Math.abs(vy) * T) / 4);
+    for (let i = 1; i < n; i++) {  // stops short of the target, so the floor it stands on never counts
+      const t = T * i / n, px = ox + vx * t, py = oy + vy * t + 0.5 * C.GRAVITY * t * t;
+      if (py < 0) return false;
+      if (blocks.some(b => px > b.left - R && px < b.right + R && py > b.top - R && py < b.bottom + R)) return false;
+    }
+    return true;
   }
 
   setupTouchControls() {
