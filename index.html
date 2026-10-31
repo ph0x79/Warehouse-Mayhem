@@ -2115,7 +2115,23 @@ class GameScene extends Phaser.Scene {
       }
       if (ptr.leftButtonDown() || ptr.wasTouch) this.throwPoop(ptr.x, ptr.y);
     });
+    // Space throws for keyboard-only players (jump is W/Up, so it is free). addKey captures it,
+    // so the page does not scroll.
+    this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE)
+      .on('down', () => this.throwAtAutoTarget());
     this.input.keyboard.on('keydown-ESC', () => this.togglePause());
+  }
+
+  // Keyboard throw: at the fan hub while it can still be nuked, since that clears the screen;
+  // otherwise at the nearest enemy or boss. Nothing to aim at, no throw.
+  throwAtAutoTarget() {
+    if (this.fanSpinning && !this.fanTriggered) return this.throwPoop(this.fanCX, this.fanCY);
+    const { x, y } = this.player;
+    const targets = this.enemies.getChildren().filter(e => e.active && !e.stunned);
+    if (this.boss && this.boss.active && !this.boss.stunned) targets.push(this.boss);
+    const near = targets.filter(t => t.x >= 0 && t.x <= C.WIDTH)
+      .sort((a, b) => Phaser.Math.Distance.Between(x, y, a.x, a.y) - Phaser.Math.Distance.Between(x, y, b.x, b.y))[0];
+    if (near) this.throwPoop(near.x, near.y);
   }
 
   setupTouchControls() {
