@@ -11,7 +11,9 @@ try {
   await page.route('**/.netlify/functions/get-scores', r => boardDown
     ? r.fulfill({ status: 500, contentType: 'application/json', body: '[]' })
     : r.fulfill({ contentType: 'application/json', body: JSON.stringify(TOP) }));
-  await page.route('**/.netlify/functions/submit-score', r => r.fulfill({ status: 500, body: '{}' }));
+  // The rate-limited path from submit-score's config (#31). 429 is what Netlify answers over the limit.
+  let submits = 0;
+  await page.route('**/api/submit-score', r => { submits++; r.fulfill({ status: 429, body: '' }); });
   const texts = () => page.evaluate(() => window.__game.scene.getScene('GameOver').children.list
     .filter(o => o.type === 'Text').map(o => o.text));
 
@@ -74,6 +76,7 @@ try {
   await page.waitForFunction(() => window.__game.scene.isActive('GameOver'), null, { timeout: 5000 });
   await page.waitForTimeout(800);
   assert.ok((await texts()).includes('SCORE NOT SAVED'), 'failed save is reported');
+  assert.equal(submits, 1, 'the save went to the rate-limited path');
   rows = await page.evaluate(() => window.__game.scene.getScene('GameOver').children.list
     .filter(o => o.type === 'Text' && /^\s*\d+\.\s/.test(o.text)).map(o => [o.text, o.style.color]));
   assert.deepEqual(highlighted(rows), [], 'failed save is not highlighted');
