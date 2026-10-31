@@ -2141,8 +2141,8 @@ class GameScene extends Phaser.Scene {
     if (pick) this.throwPoop(pick.x, pick.y);
   }
 
-  // Samples the arc lob() would fly from the player to (tx,ty): false if it leaves the top of the
-  // world or the poop's body would touch a shelf or pallet, where it splats before arriving.
+  // Samples the arc lob() would fly from the player to (tx,ty): false if the poop's body would touch
+  // the top of the world or a shelf or pallet, where it splats before arriving.
   // Samples every ~4 px, and each block is grown by the poop's half-size (20 px body at scale 2).
   // reached(px, py) says the poop has hit the target there and ends the check, so a guard standing
   // over a pallet is hittable when the arc meets him first. A sample inside both counts as blocked:
@@ -2158,7 +2158,7 @@ class GameScene extends Phaser.Scene {
     const n = Math.ceil((d + Math.abs(vy) * T) / 4);
     for (let i = 1; i < n; i++) {  // stops short of the target, so the floor it stands on never counts
       const t = T * i / n, px = ox + vx * t, py = oy + vy * t + 0.5 * C.GRAVITY * t * t;
-      if (py < 0) return false;
+      if (py < R) return false;
       if (blocks.some(b => px > b.left - R && px < b.right + R && py > b.top - R && py < b.bottom + R)) return false;
       if (reached(px, py)) return true;
     }

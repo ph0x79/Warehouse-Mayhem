@@ -96,9 +96,28 @@ try {
   assert.ok(await until(page, () => window.__game.scene.getScene('Game').enemies.getChildren()[0]?.stunned),
     'guard behind a shelf edge: Space hits the guard on the floor');
 
+  // From the top-right shelf, the arc to a guard on the top-left shelf peaks with the poop's centre
+  // under 10 px from the top, so its body hits the ceiling. Space takes the farther guard on the floor.
+  await guardsAt(250, 172);
+  await page.evaluate(() => {
+    const g = window.__game.scene.getScene('Game');
+    const e = g.enemies.getChildren()[1];
+    e.y = 190;
+    e.body.reset(e.x, e.y);
+    g.player.body.reset(802, 124);
+    g.fanSpinning = false;  // the hub is in the clear from here and would take priority
+  });
+  await spaceThrow();
+  assert.ok(await until(page, () => window.__game.scene.getScene('Game').enemies.getChildren()[0]?.stunned),
+    'arc grazing the ceiling: Space hits the guard on the floor');
+
   // At x 330 the hub is in the clear, so the spinning fan takes priority over the guard.
   await guardsAt(800);
-  await page.evaluate(() => { window.__game.scene.getScene('Game').player.x = 330; });
+  await page.evaluate(() => {
+    const g = window.__game.scene.getScene('Game');
+    g.fanSpinning = true;
+    g.player.body.reset(330, 536);
+  });
   await spaceThrow();
   assert.ok(await until(page, () => window.__game.scene.getScene('Game').fanTriggered),
     'clear fan shot: Space sets off the nuke');
