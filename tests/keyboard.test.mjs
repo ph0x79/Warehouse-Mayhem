@@ -55,6 +55,23 @@ try {
   await spaceThrow();
   assert.ok(await until(page, () => window.__game.scene.getScene('Game').enemies.getChildren()[0]?.stunned),
     'walking guard: Space leads him and hits');
+
+  // The pallet at x 670-750 blocks the arc to where the walker stands now, but not to where he will
+  // be. clearShot must test the lead point, or Space gives up on him for the guard on the far left.
+  await guardsAt(740, 20);
+  await page.evaluate(() => {
+    const g = window.__game.scene.getScene('Game');
+    Object.assign(g.enemies.getChildren()[0], { speed: 130, dir: 1, dirUntil: Infinity, pace: 1, paceUntil: Infinity });
+    g.player.body.reset(400, 536);
+  });
+  assert.ok(await until(page, () => window.__game.scene.getScene('Game').enemies.getChildren()[0].body.velocity.x > 0),
+    'the walker walks right');
+  // Handles, because a stunned enemy leaves the group.
+  const guard = i => page.evaluateHandle(i => window.__game.scene.getScene('Game').enemies.getChildren()[i], i);
+  const walker = await guard(0), still = await guard(1);
+  await spaceThrow();
+  assert.ok(await until(page, w => w.stunned, walker), 'walker past a pallet: Space leads him over it');
+  assert.equal(await still.evaluate(s => s.stunned), false, 'and does not settle for the far guard');
   await page.evaluate(({ x, y }) => window.__game.scene.getScene('Game').player.body.reset(x, y), spawn);
 
   await guardsAt(40, 900);
