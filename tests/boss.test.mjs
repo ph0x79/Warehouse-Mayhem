@@ -1,6 +1,6 @@
 // Boss spawns with 3 HP, survives a real fan nuke, dies on the third poop hit and awards 2000 points.
 import assert from 'node:assert/strict';
-import { launch, openGame } from './lib.mjs';
+import { launch, openGame, until } from './lib.mjs';
 
 const browser = await launch();
 try {
@@ -19,6 +19,12 @@ try {
     p.body.setAllowGravity(false);
     p.setVelocity(0, 0);
   }, onFan);
+
+  // Waits until the boss has taken the hit (or died) and the stun flash has finished.
+  const settled = hp => until(page, hp => {
+    const b = window.__game.scene.getScene('Game').boss;
+    return !b || (b.bossHP === hp && !b.stunned);
+  }, hp);
 
   await page.evaluate(() => window.__game.scene.getScene('Game').addScore(10000, 480, 300));
   await page.waitForTimeout(500);
@@ -48,12 +54,12 @@ try {
   const scoreBefore = s.score;
   for (const hp of [2, 1]) {
     await dropPoop(false);
-    await page.waitForTimeout(1400);  // stun flash lasts 1000ms
+    await settled(hp);
     s = await snap();
     assert.deepEqual([s.alive, s.hp], [true, hp], `boss at ${hp} HP`);
   }
   await dropPoop(false);
-  await page.waitForTimeout(1400);
+  await settled(0);
   s = await snap();
   assert.equal(s.alive, false, 'boss defeated on hit 3');
   assert.equal(s.score, scoreBefore + 2000, 'defeat awards 2000 points');

@@ -1,7 +1,7 @@
 // The reticle is the aim cursor during play, so the OS arrow is hidden. Every way out of the
 // game scene has to bring it back: pause, death, and leaving for another scene.
 import assert from 'node:assert/strict';
-import { launch, openGame } from './lib.mjs';
+import { launch, openGame, until } from './lib.mjs';
 
 const browser = await launch();
 try {
@@ -23,7 +23,8 @@ try {
   assert.equal(await cursor(), 'default', 'back as soon as the player dies');
 
   // And it stays back once the scene has actually handed over.
-  await page.waitForTimeout(1500);
+  assert.ok(await until(page, () => ['GameOver', 'EnterInitials'].some(k => window.__game.scene.isActive(k))),
+    'the scene hands over after death');
   assert.equal(await cursor(), 'default', 'still back after the scene change');
 
   assert.deepEqual(errors, [], 'page errors');
