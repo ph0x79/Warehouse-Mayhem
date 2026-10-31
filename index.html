@@ -2144,8 +2144,9 @@ class GameScene extends Phaser.Scene {
   // Samples the arc lob() would fly from the player to (tx,ty): false if it leaves the top of the
   // world or the poop's body would touch a shelf or pallet, where it splats before arriving.
   // Samples every ~4 px, and each block is grown by the poop's half-size (20 px body at scale 2).
-  // reached(px, py) says the poop has hit the target there, which wins over a block it overlaps,
-  // so a guard standing over a pallet still counts as hittable.
+  // reached(px, py) says the poop has hit the target there and ends the check, so a guard standing
+  // over a pallet is hittable when the arc meets him first. A sample inside both counts as blocked:
+  // the poop's block collider runs before its hit tests, so in the game the shelf wins that tie.
   clearShot(tx, ty, reached = () => false) {
     const ox = this.player.x, oy = this.player.y - 10, spd = C.POOP_SPEED * this.fanWind;
     const dx = tx - ox, dy = ty - oy, d = Math.sqrt(dx*dx + dy*dy);
@@ -2157,9 +2158,9 @@ class GameScene extends Phaser.Scene {
     const n = Math.ceil((d + Math.abs(vy) * T) / 4);
     for (let i = 1; i < n; i++) {  // stops short of the target, so the floor it stands on never counts
       const t = T * i / n, px = ox + vx * t, py = oy + vy * t + 0.5 * C.GRAVITY * t * t;
-      if (reached(px, py)) return true;
       if (py < 0) return false;
       if (blocks.some(b => px > b.left - R && px < b.right + R && py > b.top - R && py < b.bottom + R)) return false;
+      if (reached(px, py)) return true;
     }
     return true;
   }

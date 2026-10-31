@@ -80,6 +80,22 @@ try {
   assert.equal(await page.evaluate(() => window.__game.scene.getScene('Game').fanTriggered), false,
     'and the fan is not set off');
 
+  // A guard on the edge of the top-right shelf, seen from the floor below it: the arc reaches his
+  // box where it also meets the shelf, and the shelf wins in the game. So Space takes the farther
+  // guard on the floor instead.
+  await guardsAt(200, 780);
+  await page.evaluate(() => {
+    const g = window.__game.scene.getScene('Game');
+    const e = g.enemies.getChildren()[1];
+    e.y = 130;
+    e.body.reset(e.x, e.y);
+    g.player.x = 695;
+    g.player.body.reset(695, g.player.y);
+  });
+  await spaceThrow();
+  assert.ok(await until(page, () => window.__game.scene.getScene('Game').enemies.getChildren()[0]?.stunned),
+    'guard behind a shelf edge: Space hits the guard on the floor');
+
   // At x 330 the hub is in the clear, so the spinning fan takes priority over the guard.
   await guardsAt(800);
   await page.evaluate(() => { window.__game.scene.getScene('Game').player.x = 330; });
