@@ -2122,16 +2122,34 @@ class GameScene extends Phaser.Scene {
     this.input.keyboard.on('keydown-ESC', () => this.togglePause());
   }
 
-  // Keyboard throw: at the fan hub while it can still be nuked, since that clears the screen;
-  // otherwise at the nearest enemy or boss. Nothing to aim at, no throw.
+  // Keyboard throw. Priority: the fan hub while it can still be nuked (that clears the screen),
+  // then the nearest on-screen enemy or boss. The first of those with a clear arc wins; with none
+  // clear, the first anyway, as a click there would. Nothing to aim at, no throw.
   throwAtAutoTarget() {
-    if (this.fanSpinning && !this.fanTriggered) return this.throwPoop(this.fanCX, this.fanCY);
     const { x, y } = this.player;
+    const dist = t => Phaser.Math.Distance.Between(x, y, t.x, t.y);
     const targets = this.enemies.getChildren().filter(e => e.active && !e.stunned);
     if (this.boss && this.boss.active && !this.boss.stunned) targets.push(this.boss);
-    const near = targets.filter(t => t.x >= 0 && t.x <= C.WIDTH)
-      .sort((a, b) => Phaser.Math.Distance.Between(x, y, a.x, a.y) - Phaser.Math.Distance.Between(x, y, b.x, b.y))[0];
-    if (near) this.throwPoop(near.x, near.y);
+    const order = targets.filter(t => t.x >= 0 && t.x <= C.WIDTH).sort((a, b) => dist(a) - dist(b));
+    if (this.fanSpinning && !this.fanTriggered) order.unshift({ x: this.fanCX, y: this.fanCY });
+    const pick = order.find(t => this.clearShot(t.x, t.y)) || order[0];
+    if (pick) this.throwPoop(pick.x, pick.y);
+  }
+
+  // Samples the arc lob() would fly from the player to (tx,ty): false if it leaves the top of the
+  // world or passes through a shelf or pallet, where the poop would splat before arriving.
+  clearShot(tx, ty) {
+    const ox = this.player.x, oy = this.player.y - 10, spd = C.POOP_SPEED * this.fanWind;
+    const dx = tx - ox, dy = ty - oy, d = Math.sqrt(dx*dx + dy*dy);
+    if (d === 0) return true;
+    const T = d / spd, vx = (dx/d) * spd, vy = (dy/d) * spd - 0.5 * C.GRAVITY * T;
+    const blocks = [...this.platforms.getChildren(), ...this.pallets.getChildren()].map(b => b.body);
+    for (let i = 1; i < 24; i++) {
+      const t = T * i / 24, px = ox + vx * t, py = oy + vy * t + 0.5 * C.GRAVITY * t * t;
+      if (py < 0) return false;
+      if (blocks.some(b => px > b.left && px < b.right && py > b.top && py < b.bottom)) return false;
+    }
+    return true;
   }
 
   setupTouchControls() {
