@@ -2137,17 +2137,21 @@ class GameScene extends Phaser.Scene {
   }
 
   // Samples the arc lob() would fly from the player to (tx,ty): false if it leaves the top of the
-  // world or passes through a shelf or pallet, where the poop would splat before arriving.
+  // world or the poop's body would touch a shelf or pallet, where it splats before arriving.
+  // Samples every ~4 px, and each block is grown by the poop's half-size (20 px body at scale 2).
   clearShot(tx, ty) {
     const ox = this.player.x, oy = this.player.y - 10, spd = C.POOP_SPEED * this.fanWind;
     const dx = tx - ox, dy = ty - oy, d = Math.sqrt(dx*dx + dy*dy);
     if (d === 0) return true;
     const T = d / spd, vx = (dx/d) * spd, vy = (dy/d) * spd - 0.5 * C.GRAVITY * T;
+    const R = 10;
     const blocks = [...this.platforms.getChildren(), ...this.pallets.getChildren()].map(b => b.body);
-    for (let i = 1; i < 24; i++) {
-      const t = T * i / 24, px = ox + vx * t, py = oy + vy * t + 0.5 * C.GRAVITY * t * t;
+    // The arc's apex can rise well above the straight line, so size the steps on both legs.
+    const n = Math.ceil((d + Math.abs(vy) * T) / 4);
+    for (let i = 1; i < n; i++) {  // stops short of the target, so the floor it stands on never counts
+      const t = T * i / n, px = ox + vx * t, py = oy + vy * t + 0.5 * C.GRAVITY * t * t;
       if (py < 0) return false;
-      if (blocks.some(b => px > b.left && px < b.right && py > b.top && py < b.bottom)) return false;
+      if (blocks.some(b => px > b.left - R && px < b.right + R && py > b.top - R && py < b.bottom + R)) return false;
     }
     return true;
   }
