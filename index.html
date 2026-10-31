@@ -2134,13 +2134,13 @@ class GameScene extends Phaser.Scene {
     if (this.fanSpinning && !this.fanTriggered) order.unshift({ x: this.fanCX, y: this.fanCY, fan: true });
     // Full lead: aim where a walker will be when the poop lands, x + vx * T. T depends on the aim
     // point, so it is solved twice: from the target, then from the first lead point. Roamers turn
-    // 40 px from either edge (roam()), so the lead stops there and never leaves the screen.
+    // 40 px from either edge (roam()), so their lead stops there. Workers walk straight off.
     const ox = x, oy = y - 10, spd = C.POOP_SPEED * this.fanWind;
     const vx = t => t.body ? t.body.velocity.x : 0;
     const lead = t => {
       let lx = t.x;
       for (let i = 0; i < 2; i++) lx = t.x + vx(t) * Phaser.Math.Distance.Between(ox, oy, lx, t.y) / spd;
-      return vx(t) ? Phaser.Math.Clamp(lx, 40, C.WIDTH - 40) : lx;
+      return vx(t) && !t.randomWalk ? Phaser.Math.Clamp(lx, 40, C.WIDTH - 40) : lx;
     };
     // The same hit tests the poop meets in flight: the fan's ellipse, or the target's body grown by
     // the poop's half-size and moved as far as he walks in s seconds.
