@@ -8,7 +8,7 @@ try {
   const { page, errors } = await openGame(browser, { startGame: true });
   const fan = () => page.evaluate(() => {
     const g = window.__game.scene.getScene('Game');
-    return { charge: g.fanCharge, spinning: g.fanSpinning, score: g.score, locked: g.time.now < g.fanLockoutUntil };
+    return { charge: g.fanCharge, spinning: g.fanSpinning, score: g.score, locked: g.now < g.fanLockoutUntil };
   });
 
   // Charge it to the threshold the normal way.
@@ -61,6 +61,18 @@ try {
   assert.equal(f.charge, 0, 'spin-down clears the charge');
   assert.equal(f.locked, true, 'still in cooldown');
 
+  // A pause stops the cooldown clock: 2.5 s on the pause screen must not come off the lockout (#29).
+  const secsLeft = () => page.evaluate(() =>
+    Number(/HEAT STRESS (\d+)s/.exec(window.__game.scene.getScene('Game').fanLabel.text)?.[1]));
+  const beforePause = await secsLeft();
+  await page.evaluate(() => window.__game.scene.getScene('Game').togglePause());
+  await page.waitForTimeout(2500);
+  await page.evaluate(() => window.__game.scene.getScene('Game').togglePause());
+  await page.waitForTimeout(100);
+  const afterPause = await secsLeft();
+  assert.ok(afterPause >= beforePause - 1, `pause does not eat the cooldown (${beforePause}s before, ${afterPause}s after)`);
+  assert.equal((await fan()).locked, true, 'still in cooldown after the pause');
+
   // Scoring during the rest of the cooldown stays off the meter.
   await page.evaluate(() => window.__game.scene.getScene('Game').addScore(700, 400, 300));
   assert.equal((await fan()).charge, 0, 'points during cooldown do not charge the fan');
@@ -71,7 +83,7 @@ try {
   // Once the cooldown ends, charging resumes from zero.
   await page.evaluate(() => {
     const g = window.__game.scene.getScene('Game');
-    g.fanLockoutUntil = g.time.now;
+    g.fanLockoutUntil = g.now;
     g.addScore(250, 400, 300);
   });
   assert.equal((await fan()).charge, 250, 'charging resumes from zero after the cooldown');

@@ -1529,6 +1529,10 @@ const SFX = (() => {
 class GameScene extends Phaser.Scene {
   constructor() { super('Game'); }
 
+  // Play-time clock in ms for every cooldown and deadline. It advances only in update(), so a pause
+  // stops it; this.time.now and update's `time` jump ahead by the whole pause on resume (#29).
+  get now() { return this.elapsed * 1000; }
+
   create() {
     this.add.image(0, 0, 'background').setOrigin(0, 0).setScale(2);
 
@@ -1628,7 +1632,7 @@ class GameScene extends Phaser.Scene {
 
   throwPoop(tx, ty) {
     if (!this.gameRunning) return;
-    const now = this.time.now;
+    const now = this.now;
     if (now - this.lastThrow < C.POOP_COOLDOWN) return;
     this.lastThrow = now;
     SFX.throw();
@@ -1699,8 +1703,8 @@ class GameScene extends Phaser.Scene {
           // Respawn at edge after stun
           enemy.x = Math.random() < 0.5 ? -30 : C.WIDTH + 30;
           // Reset projectile timers so enemy doesn't fire immediately on re-entry
-          if (enemy.lastShot  !== undefined) enemy.lastShot  = this.time.now;
-          if (enemy.lastThrow !== undefined) enemy.lastThrow = this.time.now;
+          if (enemy.lastShot  !== undefined) enemy.lastShot  = this.now;
+          if (enemy.lastThrow !== undefined) enemy.lastThrow = this.now;
         }
       }
     });
@@ -1762,7 +1766,7 @@ class GameScene extends Phaser.Scene {
         enemy.points      = 250;
         enemy.speed       = Phaser.Math.Between(80, 130);
         enemy.enemyType   = 'guard';
-        enemy.lastShot    = this.time.now;
+        enemy.lastShot    = this.now;
         enemy.shootDelay  = Phaser.Math.Between(2500, 4000);
         break;
 
@@ -1772,7 +1776,7 @@ class GameScene extends Phaser.Scene {
         enemy.points      = 500;
         enemy.speed       = Phaser.Math.Between(70, 110);
         enemy.enemyType   = 'manager';
-        enemy.lastThrow   = this.time.now;
+        enemy.lastThrow   = this.now;
         enemy.throwDelay  = Phaser.Math.Between(2000, 3500);
         break;
     }
@@ -1785,8 +1789,8 @@ class GameScene extends Phaser.Scene {
       enemy.dir       = fromLeft ? 1 : -1;
       enemy.setFlipX(enemy.dir < 0);
       enemy.pace      = 1;
-      enemy.paceUntil = this.time.now + Phaser.Math.Between(1000, 3000);
-      enemy.dirUntil  = this.time.now + Phaser.Math.Between(1500, 3000);
+      enemy.paceUntil = this.now + Phaser.Math.Between(1000, 3000);
+      enemy.dirUntil  = this.now + Phaser.Math.Between(1500, 3000);
       this.physics.add.collider(enemy, this.platforms); // no pallet collision — enemies walk through them
     }
   }
@@ -1885,7 +1889,7 @@ class GameScene extends Phaser.Scene {
     this.scoreTxt.setText('SCORE: ' + this.score);
     // The fan only charges on points earned while it is idle and out of cooldown. Every scoring
     // path routes through here, including the nuke's own kills, so this is the one place to gate.
-    if (!this.fanSpinning && this.time.now >= this.fanLockoutUntil) this.fanCharge += pts;
+    if (!this.fanSpinning && this.now >= this.fanLockoutUntil) this.fanCharge += pts;
     // Gated on no boss on screen: hitBoss() scores before clearing this.boss, and a boss still alive
     // at the next threshold delays the next one until he is gone.
     if (this.score >= this.nextBossScore && !this.boss) {
@@ -1951,7 +1955,7 @@ class GameScene extends Phaser.Scene {
   updateFan(delta) {
     const frames = delta / 16.67;   // per-step tuning below is per 60 Hz frame
     // Spin up if threshold crossed and not in post-nuke lockout
-    const now = this.time.now;
+    const now = this.now;
     if (!this.fanSpinning && this.fanCharge >= C.FAN_THRESHOLD && now >= this.fanLockoutUntil) {
       this.startFanSpin();
     }
@@ -1996,8 +2000,8 @@ class GameScene extends Phaser.Scene {
 
     // Update HUD charge bar
     const frac     = this.fanSpinning ? 1 : Math.min(this.fanCharge / C.FAN_THRESHOLD, 1);
-    const isLocked = !this.fanSpinning && this.time.now < this.fanLockoutUntil;
-    const secsLeft = Math.ceil((this.fanLockoutUntil - this.time.now) / 1000);
+    const isLocked = !this.fanSpinning && this.now < this.fanLockoutUntil;
+    const secsLeft = Math.ceil((this.fanLockoutUntil - this.now) / 1000);
     const pct      = Math.min(Math.floor(frac * 100), 100);
     this.fanBar.setScale(Math.max(frac, 0), 1);
     const color = this.fanSpinning || (!isLocked && pct >= 100) ? '#FF0000' : '#FFFFFF';
@@ -2055,7 +2059,7 @@ class GameScene extends Phaser.Scene {
     // Award points for all enemies, but lock fan charge for 10s. The lockout is set before the
     // kills are scored, so addScore() turns the nuke's own points away too.
     const LOCKOUT_MS = 10000;
-    this.fanLockoutUntil = this.time.now + LOCKOUT_MS;
+    this.fanLockoutUntil = this.now + LOCKOUT_MS;
     this.enemies.getChildren().slice().forEach(enemy => {
       if (!enemy.active) return;
       this.addScore(enemy.points || 100, enemy.x, enemy.y - 20);
@@ -2213,7 +2217,7 @@ class GameScene extends Phaser.Scene {
   }
 
   updateCooldownBar() {
-    const frac = Math.min((this.time.now - this.lastThrow) / C.POOP_COOLDOWN, 1);
+    const frac = Math.min((this.now - this.lastThrow) / C.POOP_COOLDOWN, 1);
     this.cdBar.setDisplaySize(frac * 100, 8);
     this.cdBar.setFillStyle(frac >= 1 ? 0x44FF44 : 0xFFC425);
   }
@@ -2252,8 +2256,8 @@ class GameScene extends Phaser.Scene {
     this.updateCooldownBar();
     this.updateFan(delta);
     this.tickSpawning(delta);
-    this.updateEnemies(time, delta);
-    this.updateBoss(time);
+    this.updateEnemies(this.now, delta);
+    this.updateBoss(this.now);
 
     // Rotate poop
     this.poops.getChildren().forEach(p => { p.angle += 8 * delta / 16.67; });
@@ -2344,19 +2348,19 @@ class GameScene extends Phaser.Scene {
     this.boss.stunned    = false;
     this.boss.dir        = fromLeft ? 1 : -1;
     this.boss.speed      = Math.min(100, 50 + n * 10);
-    this.boss.lastThrow  = this.time.now;
+    this.boss.lastThrow  = this.now;
     this.boss.throwDelay = 2000;
     this.boss.pace       = 1;
-    this.boss.paceUntil  = this.time.now + 2000;
-    this.boss.dirUntil   = this.time.now + 2000;
-    this.boss.nextJump   = this.time.now + 2000;
+    this.boss.paceUntil  = this.now + 2000;
+    this.boss.dirUntil   = this.now + 2000;
+    this.boss.nextJump   = this.now + 2000;
     this.boss.setFlipX(this.boss.dir < 0);
     // Shelves are one-way for him: he jumps up through them and lands only when he was above the
     // shelf last frame, and drops through while dropUntil is ahead. The floor always holds.
     this.boss.dropUntil = 0;
     this.physics.add.collider(this.boss, this.platforms, null, (boss, plat) =>
       plat.body.top >= C.HEIGHT - 64 ||
-      (boss.body.velocity.y >= 0 && this.time.now > boss.dropUntil &&
+      (boss.body.velocity.y >= 0 && this.now > boss.dropUntil &&
        boss.body.prev.y + boss.body.height <= plat.body.top + 4));
 
     // Sprite first: Phaser passes (sprite, groupChild) whichever order the args
