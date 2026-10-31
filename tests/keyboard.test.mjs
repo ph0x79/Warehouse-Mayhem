@@ -39,6 +39,54 @@ try {
   assert.equal(vx.length, 1, 'Space throws one poop');
   assert.ok(vx[0] > 0, `aimed right at the guard (vx ${vx[0]})`);
 
+  // A guard walking at 130 px/s from walkerX in dir, a stopped guard at stillX if given, and the
+  // player on the floor at px. The world is paused while Space is pressed, so the throw sees exactly
+  // this layout. Returns handles to the two guards, because a stunned enemy leaves the group.
+  const walkerThrow = async (px, walkerX, dir, stillX) => {
+    await guardsAt(...(stillX === undefined ? [walkerX] : [walkerX, stillX]));
+    await page.evaluate(([px, dir]) => {
+      const g = window.__game.scene.getScene('Game');
+      g.physics.world.pause();
+      g.fanCharge = 0;  // four hits would charge the fan, and its downdraft changes the later arcs
+      const e = g.enemies.getChildren()[0];
+      Object.assign(e, { speed: 130, dir, dirUntil: Infinity, pace: 1, paceUntil: Infinity });
+      e.body.velocity.x = 130 * dir;
+      g.player.body.reset(px, 536);
+    }, [px, dir]);
+    const guard = i => page.evaluateHandle(i => window.__game.scene.getScene('Game').enemies.getChildren()[i], i);
+    const handles = [await guard(0), await guard(1)];
+    await spaceThrow();
+    await page.evaluate(() => window.__game.scene.getScene('Game').physics.world.resume());
+    return handles;
+  };
+  const stunned = h => until(page, e => e.stunned, h);
+  // The spawn point is restored after these, for the fan checks.
+  const spawn = await page.evaluate(() => {
+    const { x, y } = window.__game.scene.getScene('Game').player;
+    return { x, y };
+  });
+
+  // A guard walking away is hit: Space leads him to where he will be when the poop lands.
+  let [walker, still] = await walkerThrow(330, 600, 1);
+  assert.ok(await stunned(walker), 'walking guard: Space leads him and hits');
+
+  // The pallet at x 670-750 blocks the arc to where the walker stands now, but not to where he will
+  // be. clearShot must test the lead point, or Space gives up on him for the guard on the far left.
+  [walker, still] = await walkerThrow(400, 740, 1, 20);
+  assert.ok(await stunned(walker), 'walker past a pallet: Space leads him over it');
+  assert.equal(await still.evaluate(s => s.stunned), false, 'and does not settle for the far guard');
+
+  // Walking left onto that pallet: the arc meets him before it meets the pallet, but only where he
+  // will be by then. clearShot's box must walk with him, or the shot reads as blocked.
+  [walker, still] = await walkerThrow(400, 770, -1, 20);
+  assert.ok(await stunned(walker), 'walker onto a pallet: Space hits him');
+  assert.equal(await still.evaluate(s => s.stunned), false, 'and does not settle for the far guard');
+
+  // Near the left wall he turns 40 px from the edge, so the lead stops there instead of past the wall.
+  [walker] = await walkerThrow(450, 100, -1);
+  assert.ok(await stunned(walker), 'guard turning at the wall: Space aims where he turns');
+  await page.evaluate(({ x, y }) => window.__game.scene.getScene('Game').player.body.reset(x, y), spawn);
+
   await guardsAt(40, 900);
   vx = await spaceThrow();
   assert.ok(vx.length === 1 && vx[0] < 0, `aimed at the nearer guard, on the left (vx ${vx})`);

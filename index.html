@@ -2132,20 +2132,33 @@ class GameScene extends Phaser.Scene {
     if (this.boss && this.boss.active && !this.boss.stunned) targets.push(this.boss);
     const order = targets.filter(t => t.x >= 0 && t.x <= C.WIDTH).sort((a, b) => dist(a) - dist(b));
     if (this.fanSpinning && !this.fanTriggered) order.unshift({ x: this.fanCX, y: this.fanCY, fan: true });
+    // Full lead: aim where a walker will be when the poop lands, x + vx * T. T depends on the aim
+    // point, so it is solved twice: from the target, then from the first lead point. Roamers turn
+    // 40 px from either edge (roam()), so their lead stops there. Workers walk straight off.
+    const ox = x, oy = y - 10, spd = C.POOP_SPEED * this.fanWind;
+    const vx = t => t.body ? t.body.velocity.x : 0;
+    const lead = t => {
+      let lx = t.x;
+      for (let i = 0; i < 2; i++) lx = t.x + vx(t) * Phaser.Math.Distance.Between(ox, oy, lx, t.y) / spd;
+      return vx(t) && !t.randomWalk ? Phaser.Math.Clamp(lx, 40, C.WIDTH - 40) : lx;
+    };
     // The same hit tests the poop meets in flight: the fan's ellipse, or the target's body grown by
-    // the poop's half-size.
+    // the poop's half-size and moved as far as he walks in s seconds.
     const hits = t => t.fan
       ? (px, py) => ((px - this.fanCX) / C.FAN_HIT_RX) ** 2 + ((py - this.fanCY) / C.FAN_HIT_RY) ** 2 < 1
-      : (px, py) => px > t.body.left - 10 && px < t.body.right + 10 && py > t.body.top - 10 && py < t.body.bottom + 10;
-    const pick = order.find(t => this.clearShot(t.x, t.y, hits(t))) || order[0];
-    if (pick) this.throwPoop(pick.x, pick.y);
+      : (px, py, s) => {
+        const dx = vx(t) * s;
+        return px > t.body.left + dx - 10 && px < t.body.right + dx + 10 && py > t.body.top - 10 && py < t.body.bottom + 10;
+      };
+    const pick = order.find(t => this.clearShot(lead(t), t.y, hits(t))) || order[0];
+    if (pick) this.throwPoop(lead(pick), pick.y);
   }
 
   // Samples the arc lob() would fly from the player to (tx,ty): false if the poop's body would touch
   // the top of the world or a shelf or pallet, where it splats before arriving.
   // Samples every ~4 px, and each block is grown by the poop's half-size (20 px body at scale 2).
-  // reached(px, py) says the poop has hit the target there and ends the check, so a guard standing
-  // over a pallet is hittable when the arc meets him first. A sample inside both counts as blocked:
+  // reached(px, py, t) says the poop, t seconds into its flight, has hit the target there and ends
+  // the check, so a guard standing over a pallet is hittable when the arc meets him first. A sample inside both counts as blocked:
   // the poop's block collider runs before its hit tests, so in the game the shelf wins that tie.
   clearShot(tx, ty, reached = () => false) {
     const ox = this.player.x, oy = this.player.y - 10, spd = C.POOP_SPEED * this.fanWind;
@@ -2160,7 +2173,7 @@ class GameScene extends Phaser.Scene {
       const t = T * i / n, px = ox + vx * t, py = oy + vy * t + 0.5 * C.GRAVITY * t * t;
       if (py < R) return false;
       if (blocks.some(b => px > b.left - R && px < b.right + R && py > b.top - R && py < b.bottom + R)) return false;
-      if (reached(px, py)) return true;
+      if (reached(px, py, t)) return true;
     }
     return true;
   }
