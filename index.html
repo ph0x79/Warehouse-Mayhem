@@ -2131,15 +2131,22 @@ class GameScene extends Phaser.Scene {
     const targets = this.enemies.getChildren().filter(e => e.active && !e.stunned);
     if (this.boss && this.boss.active && !this.boss.stunned) targets.push(this.boss);
     const order = targets.filter(t => t.x >= 0 && t.x <= C.WIDTH).sort((a, b) => dist(a) - dist(b));
-    if (this.fanSpinning && !this.fanTriggered) order.unshift({ x: this.fanCX, y: this.fanCY });
-    const pick = order.find(t => this.clearShot(t.x, t.y)) || order[0];
+    if (this.fanSpinning && !this.fanTriggered) order.unshift({ x: this.fanCX, y: this.fanCY, fan: true });
+    // The same hit tests the poop meets in flight: the fan's ellipse, or the target's body grown by
+    // the poop's half-size.
+    const hits = t => t.fan
+      ? (px, py) => ((px - this.fanCX) / C.FAN_HIT_RX) ** 2 + ((py - this.fanCY) / C.FAN_HIT_RY) ** 2 < 1
+      : (px, py) => px > t.body.left - 10 && px < t.body.right + 10 && py > t.body.top - 10 && py < t.body.bottom + 10;
+    const pick = order.find(t => this.clearShot(t.x, t.y, hits(t))) || order[0];
     if (pick) this.throwPoop(pick.x, pick.y);
   }
 
   // Samples the arc lob() would fly from the player to (tx,ty): false if it leaves the top of the
   // world or the poop's body would touch a shelf or pallet, where it splats before arriving.
   // Samples every ~4 px, and each block is grown by the poop's half-size (20 px body at scale 2).
-  clearShot(tx, ty) {
+  // reached(px, py) says the poop has hit the target there, which wins over a block it overlaps,
+  // so a guard standing over a pallet still counts as hittable.
+  clearShot(tx, ty, reached = () => false) {
     const ox = this.player.x, oy = this.player.y - 10, spd = C.POOP_SPEED * this.fanWind;
     const dx = tx - ox, dy = ty - oy, d = Math.sqrt(dx*dx + dy*dy);
     if (d === 0) return true;
@@ -2150,6 +2157,7 @@ class GameScene extends Phaser.Scene {
     const n = Math.ceil((d + Math.abs(vy) * T) / 4);
     for (let i = 1; i < n; i++) {  // stops short of the target, so the floor it stands on never counts
       const t = T * i / n, px = ox + vx * t, py = oy + vy * t + 0.5 * C.GRAVITY * t * t;
+      if (reached(px, py)) return true;
       if (py < 0) return false;
       if (blocks.some(b => px > b.left - R && px < b.right + R && py > b.top - R && py < b.bottom + R)) return false;
     }
