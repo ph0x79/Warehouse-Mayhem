@@ -2,7 +2,8 @@ import { neon } from '@neondatabase/serverless';
 
 // Netlify enforces rateLimit only on a function with a custom path, so it moves off
 // /.netlify/functions/submit-score. Over the limit Netlify answers 429 and the game shows
-// SCORE NOT SAVED. Five saves a minute per visitor is well above one player's pace (#31).
+// SCORE NOT SAVED. The limit is five saves a minute per IP, shared by everyone behind one
+// address, which is still well above one household's pace (#31).
 export const config = {
   path: '/api/submit-score',
   rateLimit: { windowLimit: 5, windowSize: 60, aggregateBy: ['ip', 'domain'] },

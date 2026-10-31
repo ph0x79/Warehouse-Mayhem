@@ -25,6 +25,7 @@ try {
       g.spawnEnemy('guard');
       const e = g.enemies.getChildren().at(-1);
       Object.assign(e, { x, speed: 0, shootDelay: 1e9 });
+      e.body.reset(x, e.y);  // the body follows x only on the next physics step, and Space may come first
     }
     return g.player.x;
   }, xs);
@@ -70,6 +71,14 @@ try {
     'blocked fan shot: Space hits the guard instead');
   assert.equal(await page.evaluate(() => window.__game.scene.getScene('Game').fanTriggered), false,
     'and does not waste the throw on the shelf');
+
+  // A guard standing over a pallet is still hittable: the poop meets him before the pallet.
+  await guardsAt(355);
+  await spaceThrow();
+  assert.ok(await until(page, () => window.__game.scene.getScene('Game').enemies.getChildren()[0]?.stunned),
+    'guard over a pallet: Space hits him, not the blocked fan');
+  assert.equal(await page.evaluate(() => window.__game.scene.getScene('Game').fanTriggered), false,
+    'and the fan is not set off');
 
   // At x 330 the hub is in the clear, so the spinning fan takes priority over the guard.
   await guardsAt(800);
