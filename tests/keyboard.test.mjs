@@ -59,7 +59,7 @@ try {
 
   // From the spawn point a shelf sits between the player and the fan hub, so the spinning fan
   // gives way to a guard he can actually hit.
-  await guardsAt(330);
+  await guardsAt(200);
   await page.evaluate(() => {
     const g = window.__game.scene.getScene('Game');
     g.fanSpinning = true;
